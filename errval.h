@@ -73,36 +73,29 @@ typedef enum {
 #define ERR(type, val) \
     (RESULT(type)){ .code = _ERR, .value = (val) }
 
-
 #ifdef GNU
 
-#define DEFAULT_ERR_HANDLER(msg) \
-    perror(msg);   \
-    return 1;
-
-#ifndef ERR_HANDLER
-    #define ERR_HANDLER DEFAULT_ERR_HANDLER
-#endif
 /* @brief:  unwraps the value contained in a RESULT() type. Uses the GNU extension
  * statement expressions
  * @param:  result - the return value of the function to be unwrapped 
  */
-#define UNWRAP(result, arg) \
+#define UNWRAP(result, handler) \
     ({ \
         typeof(result) _res = (result); \
         if (_res.code == _ERR) { \
-            ERR_HANDLER(arg); \
+            handler; \
         } \
         _res.value; \
     })
-#else
+#endif
+
 // #else
 /* @brief:  unwraps the value contained in RESULT() type - ISO C version
  * @param:  result - the return value of the function to be unwrapped 
  * @return: the result of the expression is the value if there is no error.
  *          if there is an error the function jumps to the saved stack frame
  */
-#define UNWRAP(result)  ( (result).code == _OK) \
+#define EXPECT(result)  ( (result).code == _OK) \
                         ? (result).value \
                         : (longjmp(result_handler, 1), (typeof((result).value))0)
 
@@ -113,5 +106,4 @@ typedef enum {
 /* @brief:  syntax sugar for TRY CATCH */
 #define CATCH else
 
-#endif
 #endif
