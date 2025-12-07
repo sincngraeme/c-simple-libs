@@ -46,8 +46,10 @@ typedef struct dstring_methods {
     RESULT(p_char) (*str)(dstring self);
     RESULT(size_t) (*size)(dstring self);
     RESULT(size_t) (*len)(dstring self);
-    RESULT(char) (*index)(dstring self, long index);
+    RESULT(char) (*index)(dstring self, unsigned long index);
     RESULT(size_t) (*append)(dstring* self, const char* str);
+    RESULT(size_t) (*prepend)(dstring* self, const char* str);
+    RESULT(p_char) (*token)(dstring* self, unsigned long index);
     void (*del)(dstring* self);
 } dstring_methods;
 typedef dstring* pdstring;
@@ -62,6 +64,8 @@ typedef dstring* pdstring;
         .len = get_length, \
         .index = get_character_at_index, \
         .append = append, \
+        .prepend = prepend, \
+        .token = token, \
         .del = dstring_delete, \
     }
 
@@ -90,7 +94,7 @@ static inline RESULT(size_t) get_size(dstring self) {
         return OK(size_t, (size_t)(self.end - self.start));
     }
 }
-/* @brief:  Gets the current lenght of the dynamic string (excludes null byte)
+/* @brief:  Gets the current length of the dynamic string (excludes null byte)
  * @param:  String to get size of
  * @return: RESULT(size_t) - on success returns the size 
  */
@@ -105,7 +109,7 @@ static inline RESULT(size_t) get_length(dstring self) {
  * @return: RESULT(char) - on success returns character found at index.
  *          failure indicates out of bounds
  */
-static RESULT(char) get_character_at_index(dstring self, long index) {
+static RESULT(char) get_character_at_index(dstring self, unsigned long index) {
     if(self.start == nullptr || self.end == nullptr) {
         return ERR(char, 0);
     } else if ((self.end - self.start) < 0 || *self.end != '\0') {
@@ -141,6 +145,67 @@ static RESULT(size_t) append(dstring* self, const char* str) {
         // Copy the new string to the end
         memcpy(self->start + current_size - 1, str, str_size);
         return OK(size_t, (size_t)(self->end - self->start));
+    }
+}
+/* @brief:  Appends the given dynamic string to a string literal
+ * @param:  dstring** self - reference to the dynamic string
+ * @param:  const char* str - string literal to append to
+ */
+static RESULT(size_t) prepend(dstring* self, const char* str) {
+    size_t str_size = strlen(str) + 1;
+    if(self == nullptr || self->start == nullptr || self->end == nullptr) {
+        return ERR(size_t, 0);
+    } else if((self->end - self->start) < 0 || *self->end != '\0') {
+        return ERR(size_t, 0);
+    } else {
+        // Make temporary variables on stack to store old values
+        size_t current_size = UNWRAP(get_size(*self), {
+            fprintf(stderr,  "Failed to get string size in method: Append");
+            return ERR(size_t, 0);
+        });
+        char current_str[current_size];
+        memcpy(current_str, self->start, current_size); // Copy the old string out
+        self->start = (char*)realloc(self->start, current_size + str_size - 1);
+        self->end = self->start + current_size + str_size - 1;
+        // Copy the new string in
+        memcpy(self->start, str, str_size);
+        // Copy the old string back to the end
+        memcpy(self->start + str_size - 1, current_str, current_size);
+        return OK(size_t, (size_t)(self->end - self->start));
+    }
+}
+/* @brief:  Removes n characters from the beggining of the string
+ * @param:  dstring** self - reference to the dynamic string
+ * @param:  const char* str - string literal to append to
+ */
+static RESULT(p_char) token(dstring* self, unsigned long index) {
+    if(self == nullptr || self->start == nullptr || self->end == nullptr) {
+        return ERR(p_char, nullptr);
+    } else if((self->end - self->start) < 0 || *self->end != '\0') {
+        return ERR(p_char, nullptr);
+    } else if ((self->start + index) < self->start || (self->start + index) >= self->end){
+        return ERR(p_char, nullptr);
+    } else {
+        // Make temporary variables on stack to store old values
+        size_t current_size = UNWRAP(get_size(*self), {
+            fprintf(stderr,  "Failed to get string size in method: Append");
+            return ERR(p_char, nullptr);
+        });
+        long new_size = current_size - index;
+        char current_str[current_size];
+        // Copy the old string in 
+        memcpy(current_str, self->start, current_size);
+        // The token is as long as the split index (plus null byte)
+        char* token = (char*)malloc((index + 1) * sizeof(char)); 
+        memcpy(token, self->start, index); // Copy the old string out
+        // ensure null terminated 
+        token[index + 1] = '\0'; 
+        // Resize for the smaller string
+        self->start = (char*)realloc(self->start, new_size);
+        // Copy the part of old string we want to keep back in
+        memcpy(self->start, current_str + index, new_size);
+        self->end = self->start + new_size;
+        return OK(p_char, token);
     }
 }
 /* @brief:  Allocates a new dynamic string and initializes to a given string literal
