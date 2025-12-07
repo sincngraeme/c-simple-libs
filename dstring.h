@@ -35,16 +35,20 @@ typedef struct {
 } dstring;
 
 // Setup our error value checking
-DERIVE_RESULT_INDIRECT(dstring*, p_dstring);
 DERIVE_RESULT_INDIRECT(char*, p_char);
+DERIVE_RESULT_DIRECT(char);
+DERIVE_RESULT_DIRECT(dstring);
 DERIVE_RESULT_DIRECT(size_t);
 
 /* This a list of all the methods implemented for dstring */
 typedef struct dstring_methods {
-    RESULT(p_dstring) (*new)(const char* str);
+    RESULT(dstring) (*new)(const char* str);
     RESULT(p_char) (*str)(dstring self);
     RESULT(size_t) (*size)(dstring self);
-    RESULT(size_t) (*append)(dstring** self, const char* str);
+    RESULT(size_t) (*len)(dstring self);
+    RESULT(char) (*index)(dstring self, long index);
+    RESULT(size_t) (*append)(dstring* self, const char* str);
+    void (*del)(dstring* self);
 } dstring_methods;
 typedef dstring* pdstring;
 
@@ -55,7 +59,10 @@ typedef dstring* pdstring;
         .new = dstring_new, \
         .str = get_string, \
         .size = get_size, \
+        .len = get_length, \
+        .index = get_character_at_index, \
         .append = append, \
+        .del = dstring_delete, \
     }
 
 /* @brief:  Gets the current string content of the dynamic string 
@@ -83,37 +90,57 @@ static inline RESULT(size_t) get_size(dstring self) {
         return OK(size_t, (size_t)(self.end - self.start));
     }
 }
+/* @brief:  Gets the current lenght of the dynamic string (excludes null byte)
+ * @param:  String to get size of
+ * @return: RESULT(size_t) - on success returns the size 
+ */
+static inline RESULT(size_t) get_length(dstring self) {
+    return OK(size_t, UNWRAP(get_size(self), {
+            return ERR(size_t, 0);
+    }) - 1);
+}
 /* @brief:  Gets a character at a given index 
+ * @param:  dstring self - string to index into
  * @param:  long index - index of the character to return
  * @return: RESULT(char) - on success returns character found at index.
  *          failure indicates out of bounds
  */
-
+static RESULT(char) get_character_at_index(dstring self, long index) {
+    if(self.start == nullptr || self.end == nullptr) {
+        return ERR(char, 0);
+    } else if ((self.end - self.start) < 0 || *self.end != '\0') {
+        return ERR(char, 1);
+    } else if ((self.start + index) < self.start || (self.start + index) >= self.end){
+        return ERR(char, 2);
+    } else {
+        return OK(char, *( self.start + index ));
+    }
+}
 /* @brief:  Appends a string literal to the given dynamic string
  * @param:  dstring** self - reference to the dynamic string
  * @param:  const char* str - string literal to append
  */
-static RESULT(size_t) append(dstring** self, const char* str) {
+static RESULT(size_t) append(dstring* self, const char* str) {
     size_t str_size = strlen(str) + 1;
-    if((*self)->start == nullptr || (*self)->end == nullptr) {
+    if(self == nullptr || self->start == nullptr || self->end == nullptr) {
         return ERR(size_t, 0);
-    } else if(((*self)->end - (*self)->start) < 0 || *(*self)->end != '\0') {
+    } else if((self->end - self->start) < 0 || *self->end != '\0') {
         return ERR(size_t, 0);
     } else {
         // Make temporary variables on stack to store old values
-        size_t current_size = UNWRAP(get_size(**self), {
+        size_t current_size = UNWRAP(get_size(*self), {
             fprintf(stderr,  "Failed to get string size in method: Append");
             return ERR(size_t, 0);
         });
-        char* current_str = (*self)->start;
-        *self = (dstring*)realloc(*self, sizeof(dstring) + current_size + str_size - 1);
-        (*self)->start = (char*)(*self + 1);
-        (*self)->end = (*self)->start + current_size + str_size - 1;
+        char current_str[current_size];
+        memcpy(current_str, self->start, current_size); // Copy the old string out
+        self->start = (char*)realloc(self->start, current_size + str_size - 1);
+        self->end = self->start + current_size + str_size - 1;
         // Copy the old string back in 
-        memcpy((*self)->start, current_str, current_size);
+        memcpy(self->start, current_str, current_size);
         // Copy the new string to the end
-        memcpy((*self)->start + current_size - 1, str, str_size);
-        return OK(size_t, (size_t)((*self)->end - (*self)->start));
+        memcpy(self->start + current_size - 1, str, str_size);
+        return OK(size_t, (size_t)(self->end - self->start));
     }
 }
 /* @brief:  Allocates a new dynamic string and initializes to a given string literal
@@ -122,15 +149,25 @@ static RESULT(size_t) append(dstring** self, const char* str) {
  *          - Result struct containing error enum and a pointer to dynamic string type
  *          - (The new dynamic string)
  */
-static inline RESULT(p_dstring) dstring_new(const char* str) {
-    if(str == nullptr) return ERR(p_dstring, nullptr);
+static inline RESULT(dstring) dstring_new(const char* str) {
+    dstring fail = (dstring){ .start = nullptr,.end = nullptr }; // Value to return on fail
+    if(str == nullptr) return ERR(dstring, fail);
     uint64_t str_size = strlen(str) + 1;
     // Allocate space for both the string and string literal
-    dstring* string = (dstring*)malloc(sizeof(dstring) + str_size); 
-    if(string == nullptr) return ERR(p_dstring, nullptr);
-    string->start = (char*)(string + 1); // End of the dstring part
-    string->end = string->start + str_size; // End of the actual string data
+    char* string = (char*)malloc(str_size * sizeof(char)); 
+    if(string == nullptr) return ERR(dstring, fail);
     // Copy the string into the allocated space 
-    strcpy(string->start, str);
-    return OK(p_dstring, string);
+    strcpy(string, str);
+
+    dstring final_string = {
+        .start = string,
+        .end = string + str_size // End of the actual string data
+    };
+    return OK(dstring, final_string);
+}
+/* @brief:  Deletes a dynamic string (just the start and end pointers, the stack memory will remain)
+ * @param:  dstring* self - dstring to delete 
+ */
+void dstring_delete(dstring* self) {
+    free(self->start);
 }
