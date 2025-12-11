@@ -6,7 +6,6 @@
 * Github:           https://github.com/sincngraeme/                            *
 *******************************************************************************/
 
-// TODO: X-macro for deriving types - initializationI
 #ifndef GNU
 #define GNU
 #endif
