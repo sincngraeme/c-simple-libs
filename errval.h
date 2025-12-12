@@ -12,15 +12,50 @@
 *                       pointers)                                              *
 *                   2. Use RESULT(<T>) to "wrap" your return types, return     *
 *                       from function with ERR(<T>, val) or OK(<T>, val)       *
-*                   3. Wrap function calls in TRY{ } CATCH{ }, and call with   *
-*                       UNWRAP(func())                                         *
-*                   4. UNDER NO CIRCUMSTANCES SHOULD YOU USE VLA'S OR ALLOCA   *
-*                      in your function (you probably shouldn't be anyway)     *
-*                       - UNWRAP calls longjmp() which does may skip stack     *
-*                         frames. stack-local memory is undefined, scalars     *
-*                         and pointers to heap-allocated memory are safe       *
+*                   3. Wrap RESULT(<T>) function calls in UNWRAP() and specify *
+*                       a handler in the second argument. This can be single   *
+*                       or multiline.                                          *
+*                       Ex:                                                    *
 *                                                                              *
+*                       printf("String: %s\n", UNWRAP(String.str(my_string), { *
+*                           fprintf(stderr, "Failed to access string data\n"); *
+*                           String.del(&my_string);                            *
+*                           return 1;                                          *
+*                       }));                                                   *
+*                                                                              *
+*                       or                                                     *
+*                                                                              *
+*                       printf("%s\n", UNWRAP(String.str(my_string),return 1));*
+*                       - Note: UNWRAP depends on a GNU compiler extension:    *
+*                               statement expressions. This feature is only    *
+*                               available when compiled with gcc or clang.     *
+*                               EXPECT() is ISO C23 and should (untested)      *
+*                               work with other compilers. Because of this     *
+*                               dependency, UNWRAP is not defined by default.  *
+*                               to define it, simply define GNU somewhere      *
+*                               before it is used.                             *
+*                                                                              *
+*                               #define GNU                                    *
+*                                                                              *
+*                   Steps for EXPECT usage:                                    *
+*                   1. Same as before                                          *
+*                   2. Wrap function calls in TRY{ } CATCH{ }, and call with   *
+*                       EXPECT(func())                                         *
+*                   3. Multiple EXPECT calls can exist in one try block and do *
+*                       not need to be implemented on the same type. Multiple  *
+*                       try-catches cannot be used in the same scope. This is  *
+*                       currently a limitation of the implementation. To use   *
+*                       multiple try-catches consecutively, they must be       *
+*                       wrapped in an outer scope.                             *
+*                   4. BE VERY CAREFUL WITH ANY RESOURCES THAT REQUIRE MANUAL  *
+*                       CLEANUP. Because longjmp skips stack frames, any       *
+*                       resources requiring manual cleanup that are allocated  *
+*                       between the TRY and CATCH are at risk of being leaked  *
+*                       when an error occurs. ensure that functions which      *
+*                       use the result type perform manual cleanup before      *
+*                       returning                                              *
 *******************************************************************************/
+
 #ifndef __ERRVAL_H
 #define __ERRVAL_H
 

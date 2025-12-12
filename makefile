@@ -10,14 +10,14 @@ PROGRAM = test
 
 # Link
 all: $(OBJ)
-	$(CC) $(OBJ) -o $(PROGRAM)
+	$(CC) $(OBJ) -o $(OUTDIR)$(PATHSEP)$(PROGRAM)
 
 # Compile
 $(OBJ): $(SRC)
 	$(CC) $(CFLAGS) -std=$(STD) -c $< -o $@
 
 clean:
-	rm -f $(PROGRAM) $(OBJ)
+	rm -f $(OUTDIR)$(PATHSEP)$(PROGRAM) $(OBJ)
 
 run:
-	make && $(BUILDDIR)$(PATHSEP)$(PROGRAM)
+	make && $(OUTDIR)$(PATHSEP)$(PROGRAM)
