@@ -2,10 +2,6 @@
 #include "dstring.h"
 #include "errval.h"
 
-#ifndef GNU
-#define GNU
-#endif
-
 int log_num = 0;
 #define LOG_OUTPUT stderr
 #define LOG(message) \
@@ -31,6 +27,7 @@ int main() {
     printf("Slice: %s\n", UNWRAP(String.slice(buffer, 2, 5), LOG("Failed to access string data \n")));
     printf("New string: %s\n", UNWRAP(String.str(buffer), LOG("Failed to access string data\n")));
     // Free
+
     String.del(&buffer);
     return 0;
 }

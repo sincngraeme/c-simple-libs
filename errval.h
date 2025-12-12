@@ -26,14 +26,15 @@
 *                       or                                                     *
 *                                                                              *
 *                       printf("%s\n", UNWRAP(String.str(my_string),return 1));*
-*                       - Note: UNWRAP depends on a GNU compiler extension:    *
-*                               statement expressions. This feature is only    *
-*                               available when compiled with gcc or clang.     *
-*                               EXPECT() is ISO C23 and should (untested)      *
-*                               work with other compilers. Because of this     *
-*                               dependency, UNWRAP is not defined by default.  *
-*                               to define it, simply define GNU somewhere      *
-*                               before it is used.                             *
+*                       - Note: Fully inline UNWRAP depends on a GNU compiler  *
+*                               extension: statement expressions. This feature *
+*                               is only available when compiled with gcc or    *
+*                               clang.                                         *
+*                               The TRY-CATCH version is ISO C23 and should    *
+*                               (untested) work with other compilers. Because  *
+*                               of this dependency, UNWRAP is not the inline   *
+*                               versionby default. to define it, simply define *
+*                               GNU somewhere before it is used.               *
 *                                                                              *
 *                               #define GNU                                    *
 *                                                                              *
@@ -59,9 +60,27 @@
 #ifndef __ERRVAL_H
 #define __ERRVAL_H
 
+
+/* 1. Detect that the user is compiling with GNU extensions *and*
+   wants to use C23 features (or later).                                 */
+#if defined(__GNUC__) || defined(__clang__)      /* GCC or Clang           */
+#   if defined(__STRICT_ANSI__)
+        /* The compiler was invoked with -std=cXx -pedantic – no extensions. */
+#       define GNU_STATEMENT_EXPR 0
+#   else
+        /* We are in a GNU‑mode compiler (gcc, clang …).  It will understand
+        ({ … }) if the language mode is at least C23 or later.          */
+#       define GNU_STATEMENT_EXPR 1
+#   endif
+#else
+        /* Non‑GNU compilers – no support for statement expressions.           */
+        #  define GNU_STATEMENT_EXPR 0
+#endif
+
+#if !GNU_STATEMENT_EXPR
 #include <stdio.h>
 #include <setjmp.h>
-
+#endif
 
 /* @type:   result
  * @brief:  The result enum is either an err or ok. The <T>_result_t type is 
@@ -81,7 +100,7 @@ typedef enum {
     typedef struct {        \
         result_t code;      \
         type value;         \
-    } RESULT(type); 
+    } RESULT(type) 
 
 /* @brief:  defines the result type for a given base type 
  * @param:  type - the type that result will be derived for
@@ -108,7 +127,7 @@ typedef enum {
 #define ERR(type, val) \
     (RESULT(type)){ .code = _ERR, .value = (val) }
 
-#ifdef GNU
+#if GNU_STATEMENT_EXPR
 
 /* @brief:  unwraps the value contained in a RESULT() type. Uses the GNU extension
  * statement expressions
@@ -122,23 +141,24 @@ typedef enum {
         } \
         _res.value; \
     })
-#endif
 
-// #else
+#else
 /* @brief:  unwraps the value contained in RESULT() type - ISO C version
  * @param:  result - the return value of the function to be unwrapped 
  * @return: the result of the expression is the value if there is no error.
  *          if there is an error the function jumps to the saved stack frame
  */
-#define EXPECT(result)  ( (result).code == _OK) \
+#define UNWRAP(result)  ( (result).code == _OK) \
                         ? (result).value \
                         : (longjmp(result_handler, 1), (typeof((result).value))0)
 
 /* @brief:  sets the result handler before running unwrap */
-#define TRY jmp_buf result_handler; \
+#define TRY { jmp_buf result_handler; \
     if (setjmp(result_handler) == 0)
 
 /* @brief:  syntax sugar for TRY CATCH */
-#define CATCH else
+#define CATCH(handler) else { handler } }
+
+#endif
 
 #endif
