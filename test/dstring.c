@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include "dstring.h"
-#include "errval.h"
+#include "../dstring.h"
+#include "../errval.h"
 
 int log_num = 0;
 #define LOG_OUTPUT stderr

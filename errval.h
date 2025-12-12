@@ -33,10 +33,10 @@
 *                               The TRY-CATCH version is ISO C23 and should    *
 *                               (untested) work with other compilers. Because  *
 *                               of this dependency, UNWRAP is not the inline   *
-*                               versionby default. to define it, simply define *
-*                               GNU somewhere before it is used.               *
+*                               versionby default. to define it, just compile  *
+*                               with the standard set to gnu2x.                *
 *                                                                              *
-*                               #define GNU                                    *
+*                               gcc main.c -o main -std=gnu2x                  *
 *                                                                              *
 *                   Steps for EXPECT usage:                                    *
 *                   1. Same as before                                          *

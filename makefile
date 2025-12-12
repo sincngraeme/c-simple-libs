@@ -2,9 +2,9 @@ CC = gcc
 OUTDIR = bin
 BUILDDIR = .
 PATHSEP = /
-CFLAGS = -Wall -Wextra -g -pedantic
-STD = c2x
-SRC = ./test/dstring_iso.c
+CFLAGS = -Wall -Wextra -g
+STD = gnu2x
+SRC = ./test/dstring.c
 OBJ = $(SRC:.c=.o)
 PROGRAM = test
 
