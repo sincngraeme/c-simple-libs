@@ -26,15 +26,12 @@
 *                   RESULT(type) functions see errval.h                        *
 *******************************************************************************/
 
-#ifndef GNU
-#define GNU
-#endif
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "errval.h"
+#include <stdbool.h>
+#include "csl-errval.h"
 
 #define DSTRING_MAX_SIZE UINT64_MAX
 
@@ -54,6 +51,7 @@ DERIVE_RESULT_INDIRECT(char*, p_char);
 DERIVE_RESULT_DIRECT(char);
 DERIVE_RESULT_DIRECT(dstring);
 DERIVE_RESULT_DIRECT(size_t);
+DERIVE_RESULT_DIRECT(bool);
 
 /* This a list of all the methods implemented for dstring */
 typedef struct {

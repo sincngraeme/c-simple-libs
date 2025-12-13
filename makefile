@@ -4,7 +4,7 @@ BUILDDIR = .
 PATHSEP = /
 CFLAGS = -Wall -Wextra -g
 STD = gnu2x
-SRC = ./test/dstring.c
+SRC = ./test/match.c
 OBJ = $(SRC:.c=.o)
 PROGRAM = test
 

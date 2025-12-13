@@ -4,8 +4,13 @@ A collection of simple c libraries.
 
 ## Contents
 
-- errval.h
+- `errval.h`
+- `dstring.h`
 
 ## errval.h
 
-Rust style error value wrapping. 
+Rust inspired error value wrapping. 
+
+## dstring.h
+
+Dynamic String implementation.
