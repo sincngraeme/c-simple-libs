@@ -40,6 +40,10 @@ int main() {
         (2, printf("Second\n")),
         (3, printf("Third\n")),
         (4, printf("Fourth\n")),
+        (5, printf("Fourth\n")),
+        (6, printf("Fourth\n")),
+        (7, printf("Fourth\n")),
+        (7, printf("Fourth\n")),
         (5, printf("Fifth\n"))
     );
     MATCH(true, printf("Defualt"),
