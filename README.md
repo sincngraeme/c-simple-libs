@@ -179,10 +179,6 @@ stated before READ THE DOCS on `setjmp` and `longjmp` before using this feature.
 
 Dynamic String implementation.
 
-## `csl-argparse.h` UNDER CONSTRUCTION
-
-Argument parsing library.
-
 ## `csl-match.h` 
 
 Rust-like match expressions.
