@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdbool.h>
-#include "../csl-argparse.h"
 #include "../csl-recursed.h"
 #include "../csl-match.h"
 
@@ -66,5 +65,15 @@ int main() {
         (returns_false(),  20)
     );
     printf("x: %d\n", x);
+
+    MATCH(true, printf("Default\n"),
+        (returns_false(), printf("False\n")),
+        (returns_true(), ({ 
+                           printf("True\n");
+                           printf("Second Line\n");
+                        })),
+        (returns_false(), printf("This is never reached\n"))
+    );
+
     return 0;
 }

@@ -195,12 +195,79 @@ Rust-like match expressions.
 >        /*Default*/30;
 >```
 
+The wrapper `MATCH` is used as follows:
+
+```c
+int x = 3;
+char* result = MATCH(x, "Default",
+    (1, "First"), 
+    (2, "Second"), 
+    (3, "Third"),
+    (4, "Last")
+);
+```
+
+The first argument is the value to match against, the second is the default option. I know that in most
+languages (as with the c `switch` statement), default is the last one, and is often optional, but due to
+limitations in the macro expansion, it was simplest to make it the first argument. Personally, I think this is a
+good thing because it forces the programmer to think about having a safe default first, which is necessary in an
+expression.
+
+The last argument is a list of lists in a sense. This uses unfamiliar syntax, as they are surrounded by brackets.
+This is because they become the parameter list of a function-like macro. I highly recommend reading the docs on
+`csl-recursed.h` and even the source because this is a very interesting corner of c.
+
+Each item in the list must be a two item list itself surrounded in `()`. The first item of each list entry is compared
+to the first argument one by one until there is a match, and the second argument of each list entry is the result of the match expression if the left side matches the first argument.
+
+Either item in each list entry can be a function, as long as the return type matches the type of the expression
+as a whole.
+
+```c
+// One 
+int x = MATCH(true, 30,
+    (returns_true(), 10),
+    (returns_false(),  20)
+);
+
+// Or both
+MATCH(true, false,
+    (returns_false(), printf("False\n")),
+    (returns_true(),  printf("True\n"))
+);
+```
+
+>[!note]
+>In situations where you want to run a function but either it does not return a value or you simply do not care
+>about the return, you may use `MATCH` as a statement instead of an expression, as seen in the example above.
+
+If you wish to have multiple lines of code running as the result of a `MATCH` expression, I recommend using a
+switch case instead, as you cannot use a MATCH as an expression in the context. However, if this is truly what
+you want to do, this can be achieved with a statement expression
+
+```c
+MATCH(true, printf("Default\n"),
+    (returns_false(), printf("False\n")),
+    (returns_true(), ({ 
+                       printf("True\n");
+                       printf("Second Line\n");
+                    })),
+    (returns_false(), printf("This is never reached\n"))
+);
+/* stdout:
+True
+Second Line
+
+*/
+```
+
 ### `csl-recursed.h`
 
 Provides a macro iterator for performing any macro on a list of arguments. This uses recursion and is evaluated
 by the preprocessor (worry not fellow recursion haters). Heavy use of macro magic to achieve this. `FOREACH(macro, ...)`. This is used by a number of other libraries included here. 
 
 - `csl-match.h`
+- `csl-templates.h`
 
 ```c
 #define PRINT_THIS(x) printf("%d\n", x);
@@ -262,3 +329,151 @@ is the secret sauce to getting recursive expansion passes.
 > - Jonathan Heathcote (another good [ blog post ](http://jhnet.co.uk/articles/cpp_magic) about this topic)
 >
 >Both of these examples use C++, but the principles are the same.
+
+## `csl-templates.h`
+
+This module allows for function template generation, and type inference on generated functions.
+
+Here is an example of when you might want a template function.
+
+```c
+int returns_int(int arg) {
+    return ++arg;
+}
+float returns_float(float arg) {
+    return ++arg;
+}
+int main() {
+    printf("%d", returns_int(10));          // 11
+    printf("%f", returns_float(10.0));      // 11.00000
+    return 0;
+}
+```
+
+Since these functions are nearly identical, differing only in type, a template would be useful to avoid
+maintaining two almost identical functions. Here is an example template for this case.
+
+```c
+#define TEMPLATE(T)                 \
+T returns_##T(T arg) {              \
+   return ++arg;                    \
+}
+GENERATE(int, float);
+#undef TEMPLATE // Necessary if you want to have multiple templated functions
+
+int main() {
+    // These are generated functions
+    printf("%d", returns_int(10));          // 11
+    printf("%f", returns_float(10.0));      // 11.00000
+    return 0;
+}
+```
+
+The T variable in the `TEMPLATE` macro is substituted for each type in the type list passed to `GENERATE`, which
+calls `TEMPLATE` for each item in the list. The result is as follows.
+
+```c
+int returns_int(int arg) {
+    return ++arg;
+}
+float returns_float(float arg) {
+    return ++arg;
+}
+```
+
+Identical to our first version!
+
+However, we still need to remember the names of each of the generated functions. Wouldn't it be nice if we could
+have one function that does both? We can, using a function-like macro (I did say it would come up a lot). 
+
+If we update our current example to use type inference we get this:
+
+```c
+#define TEMPLATE(T)                 \
+T my_function_##T(T arg) {          \
+   return ++arg;                    \
+}
+#define my_function(T) INFER(my_function, T, int, float) // This is where the magic happens
+GENERATE(int, float);
+#undef TEMPLATE // Necessary if you want to have multiple templated functions
+
+int main() {
+    // These are generated functions with type inference
+    printf("%d", my_function(10));      // 11
+    printf("%f", my_function(10.0));    // 11.00000
+    return 0;
+}
+```
+
+The type inference line:
+
+```c
+#define my_function(T) INFER(my_function, T, int, float)
+```
+
+I should mention, this is not *where* the type inference actually happens. It happens whenever you call
+`my_function`. This is because we have defined a function-like macro which wraps all of the generated functions
+under one name. This is thanks to the `_Generic` macro. I also recommend reading up on this feature if you don't
+know about it.
+
+The important thing to know is that we must supply the name of the function (which should match the name of the
+function-like macro we are defining), and pass the parameter of the macro to the second parameter of `INFER`.
+Then we pass the type list that we used in `GENERATE`. Now when we call `my_function` the c preprocessor
+replaces it with the correctly typed version.
+
+And that is how you get templating and type inference in plain-old-c. Do not be afraid of macros! 
+
+### Caveats
+
+The type inference implementation breaks down with multiple arguments. This will be fixed later on, likely
+requiring a second `INFER` macro specifically for this.
+
+#### Multi-type templating
+
+This is possible using another macro: `MULTIGEN` as follows:
+
+```c
+#define TEMPLATE(T, U)                 \
+U function_##T##_to_##U(T my_variable) {     \
+   my_variable += 1;                \
+   return my_variable;              \
+}
+MULTIGEN((int , float), (int, double));
+#undef TEMPLATE
+
+int main() {
+    printf("Integer: %f\n", function_int_to_float(10));
+    printf("Float: %f\n", function_int_to_double(10));
+    return 0;
+}
+```
+
+As you can see above, the example template function above generates two functions. 
+- One that accepts an integer and returns a float
+- One that accepts an integer and returns a double
+
+>[!warning]
+>`MULTIGEN` is incompatible with `INFER`. With the current implementation you cannot use type inference on
+>templates with multiple templated types.
+
+>[!note]
+>You may also have arguments that are not templated, but this is also incompatible with `INFER` at the present.
+>
+>```c
+>#define TEMPLATE(T)                                 \
+>T function_##T(T my_variable, char unused) {        \
+>   my_variable += 1;                                \
+>   return my_variable;                              \
+>}
+>GENERATE(int, double);
+>#undef TEMPLATE
+>
+>int main() {
+>    char c = 'c';
+>    printf("Integer: %f\n", function_int_to_float(10));
+>    printf("Double: %f\n", function_int_to_double(10));
+>    printf("Integer: %d\n", function_int(10, c));
+>    printf("Double: %f\n", function_double(10, c));
+>    return 0;
+>}
+>```

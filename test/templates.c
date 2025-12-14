@@ -1,19 +1,27 @@
 #include "../csl-templates.h"
 #include <stdio.h>
 
-#define function(T) INFER(function, T, long, int, float, double, char)
-#define TEMPLATE(T)                 \
-T function_##T(T my_variable) {     \
+// #define function(T, U) INFER(function, T, long, int, float, double, char)
+#define TEMPLATE(T, U)                 \
+U function_##T##_to_##U(T my_variable) {     \
    my_variable += 1;                \
    return my_variable;              \
 }
-GENERATE(long, int , float, double, char);
+MULTIGEN((int , float), (int, double));
+#undef TEMPLATE
+
+#define function(T, U) INFER(function, T, int, double)
+#define TEMPLATE(T)                                 \
+T function_##T(T my_variable, char unused) {        \
+   my_variable += 1;                                \
+   return my_variable;                              \
+}
+GENERATE(int, double);
 #undef TEMPLATE
 
 int main() {
-    printf("Integer: %d\n", function(10));
-    printf("Float: %f\n", function(10.0));
-    printf("Character: %c\n", function('A'));
+    printf("Integer: %f\n", function_int_to_float(10));
+    printf("Float: %f\n", function_int_to_double(10));
     return 0;
 }
 
