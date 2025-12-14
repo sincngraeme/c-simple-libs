@@ -139,7 +139,7 @@ function will return before the LHS can be evaluated.
 >[!note]
 >The `{}` in the second argument (the handler) are optional, but I find it makes the scope of the handler clearer, so I add them
 
-## `csl-errval.h `ISO C23 Standard 
+## csl-errval ISO C23 Standard 
 
 This is the version of `csl-errval.h` you will get when compiling in an environment which does not support GNU
 statement expressions. Everything is the same except for the `UNWRAP` macro, and the addition of some other
