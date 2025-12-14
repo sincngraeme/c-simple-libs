@@ -24,14 +24,14 @@ with their use on Windows. I cannot speak to these libraries compatibility with 
 
 ## Contents
 
-- [csl-errval](#`csl-errval.h` (GNU Extended)) (GNU Extended)
-- [csl-errval](#`csl-errval.h` ISO C23 Standard) (ISO C23)
-- [csl-dstring](#`csl-dstring.h`)
-- [csl-match](#`csl-match.h`)
-- [csl-recursed](#`csl-recursed.h`)
-- [csl-templates](#`csl-templates.h`)
+- [csl-errval (GNU Extended)](#csl-errval (GNU Extended)) 
+- [csl-errval (ISO C23)](#csl-errval ISO C23 Standard) 
+- [csl-dstring](#csl-dstring.h)
+- [csl-match](#csl-match.h)
+- [csl-recursed](#csl-recursed.h)
+- [csl-templates](#csl-templates.h)
 
-## `csl-errval.h` (GNU Extended)
+## csl-errval (GNU Extended)
 
 `csl-errval.h` is intended to provide Rust inspired error value wrapping. The basic idea is to use macros (of
 course) to wrap the usual return type of the function in a "result" type. This type is a struct which contains an
@@ -178,11 +178,11 @@ a `TRY` block, and the first one to error will break out and skip any following 
 concerns with dynamic memory between `TRY` and `CATCH`, it is encouraged that you keep these sections small. As
 stated before READ THE DOCS on `setjmp` and `longjmp` before using this feature.
 
-## `csl-dstring.h`
+## csl-dstring
 
 Dynamic String implementation.
 
-## `csl-match.h` 
+## csl-match 
 
 Rust-like match expressions.
 
@@ -264,7 +264,7 @@ Second Line
 */
 ```
 
-### `csl-recursed.h`
+### csl-recursed
 
 Provides a macro iterator for performing any macro on a list of arguments. This uses recursion and is evaluated
 by the preprocessor (worry not fellow recursion haters). Heavy use of macro magic to achieve this. `FOREACH(macro, ...)`. This is used by a number of other libraries included here. 
@@ -333,7 +333,7 @@ is the secret sauce to getting recursive expansion passes.
 >
 >Both of these examples use C++, but the principles are the same.
 
-## `csl-templates.h`
+## csl-templates
 
 This module allows for function template generation, and type inference on generated functions.
 
