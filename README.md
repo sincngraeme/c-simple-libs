@@ -24,9 +24,12 @@ with their use on Windows. I cannot speak to these libraries compatibility with 
 
 ## Contents
 
-- `csl-errval.h`
-- `csl-dstring.h`
-- `csl-dstring.h`
+- [csl-errval](#`csl-errval.h` (GNU Extended)) (GNU Extended)
+- [csl-errval](#`csl-errval.h` ISO C23 Standard) (ISO C23)
+- [csl-dstring](#`csl-dstring.h`)
+- [csl-match](#`csl-match.h`)
+- [csl-recursed](#`csl-recursed.h`)
+- [csl-templates](#`csl-templates.h`)
 
 ## `csl-errval.h` (GNU Extended)
 
