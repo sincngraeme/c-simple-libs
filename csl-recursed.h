@@ -6,6 +6,9 @@
 * Github:           https://github.com/sincngraeme/                            *
 *******************************************************************************/
 
+#ifndef _RECURSED_H
+#define _RECURSED_H
+
 // For some reason this needs expansion
 #define PARENS ()
 
@@ -28,3 +31,8 @@
     __VA_OPT__(_FOR_EACH_ PARENS (macro, __VA_ARGS__))
 /* Another necessary abstraction to prevent the prepocessor from doing the safe thing */
 #define _FOR_EACH_() _FOR_EACH
+
+/* Related Utility macros */
+#define COUNT_ARGS(T, ...) (sizeof((T[]){__VA_ARGS__})/sizeof(T))
+
+#endif
