@@ -15,6 +15,7 @@
         TYPEGEN(name, __VA_ARGS__)  \
     )(T)                            
 
+
 /* This is the top level one that will acually be called, note that defer passes
  * through the full "stack" of nested macros */
 #define TYPEGEN(name, ...) __VA_OPT__(DEFER(_TYPEGEN(name, __VA_ARGS__)))

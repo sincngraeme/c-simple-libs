@@ -10,6 +10,12 @@ c-macro hater, this is likely not the library for you. I realize that they can b
 necessary to achieve advanced features while remaining easy to use, lightweight and without requiring the use of
 assembly.
 
+## Features
+
+- Dynamic strings
+- 
+
+
 ## Portability Disclaimer
 
 While portability is a consideration, it is not my main concern as these libraries are mainly for my personal
