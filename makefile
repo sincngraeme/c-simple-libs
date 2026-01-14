@@ -4,7 +4,8 @@ BUILDDIR = .
 PATHSEP = /
 CFLAGS = -Wall -Wextra -g
 STD = gnu2x
-SRC = ./test/templates.c
+SRC = ./test/enums.c
+HDR = csl-enums.h
 OBJ = $(SRC:.c=.o)
 ARGS = #fake.file -sS --custom-message="General Kenobi!"
 PROGRAM = test
