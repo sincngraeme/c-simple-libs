@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#if defined(SMRTPTR_TYPE_LIST)
+#ifdef SMRTPTR_TYPE_LIST
 
 #define SMRTPTR_DERIVE(T) \
     typedef T* smrtptr_##T; \
