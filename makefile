@@ -2,19 +2,20 @@ CC = gcc
 OUTDIR = bin
 BUILDDIR = .
 PATHSEP = /
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -g -fsanitize=address -O1
+LFLAGS = -fsanitize=address
 STD = gnu2x
-SRC = ./test/templates.c
+SRC = ./test/smrtptrs.c
 OBJ = $(SRC:.c=.o)
 ARGS = #fake.file -sS --custom-message="General Kenobi!"
 PROGRAM = test
 
 # Link
 all: $(OBJ)
-	$(CC) $(OBJ) -o $(OUTDIR)$(PATHSEP)$(PROGRAM)
+	$(CC) $(LFLAGS) $(OBJ) -o $(OUTDIR)$(PATHSEP)$(PROGRAM)
 
 # Compile
-$(OBJ): $(SRC)
+%.o: %.c
 	$(CC) $(CFLAGS) -std=$(STD) -c $< -o $@
 
 clean:
@@ -22,3 +23,7 @@ clean:
 
 run:
 	make && $(OUTDIR)$(PATHSEP)$(PROGRAM)
+
+log:
+	@echo $(OBJ)
+	@echo $(SRC)
