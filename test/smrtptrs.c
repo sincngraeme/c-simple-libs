@@ -4,9 +4,9 @@
 #define INIT_SOLE_PTR
 #define ACCESS_PTR_REGISTRY \
     REGISTER_ACCESS_PTR(int, group1)
-
+#define SHARED_PTR_TYPE_LIST \
+    SHARED_PTR_DERIVE(int)
 #include "../csl-smrtptrs.h"
-
 
 int main() {
     {
@@ -36,5 +36,10 @@ int main() {
         }
         printf("ptr4: %d\n", *ptr4);
     }
+    {
+        // Shared ptr
+        shared_ptr(int) ptr6 = make_shared_ptr(malloc(sizeof(int)));
+    }
+    printf("Hello There!\n");
     return 0;
 }
