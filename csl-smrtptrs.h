@@ -91,28 +91,28 @@ typedef struct {
     unsigned int nweak;
 } shared_ptr_ctrlblk;
 
-#define SHARED_PTR_DERIVE(T) \
-    typedef struct { \
-        T* ptr; \
-        shared_ptr_ctrlblk* ctrl; \
-    } T##_shared_ptr; \
-    void shared_ref_shared_ptr(void* smrtptr) {
-    \
-    } \
-    void weak_ref_shared_ptr(void* smrtptr) { \
-    \
-    } \
-    void free_shared_ptr(void* smrtptr) { \
-    \
-    }
-    T##_shared_ptr make_shared_ptr(void* ptr) {
-        if(ptr == NULL) {
-            fprintf(stderr, "ERROR: make_shared_ptr recieved NULL ptr\n");
-            exit(1);
-        }
-        shared_ptr_ctrlblk* temp_ctrl = malloc(sizeof(shared_ptr_ctrlblk));
-        *temp_ctrl = { .nshared = 1, .nweak = 1 };
-        return (T##_shared_ptr){ .};
+#define SHARED_PTR_DERIVE(T)                                                \
+    typedef struct {                                                        \
+        T* ptr;                                                             \
+        shared_ptr_ctrlblk* ctrl;                                           \
+    } T##_shared_ptr;                                                       \
+    void shared_ref_shared_ptr(void* smrtptr) {                             \
+                                                                            \
+    }                                                                       \
+    void weak_ref_shared_ptr(void* smrtptr) {                               \
+                                                                            \
+    }                                                                       \
+    void free_shared_ptr(void* smrtptr) {                                   \
+                                                                            \
+    }                                                                       \
+    T##_shared_ptr make_shared_ptr(void* ptr) {                             \
+        if(ptr == NULL) {                                                   \
+            fprintf(stderr, "ERROR: make_shared_ptr recieved NULL ptr\n");  \
+            exit(1);                                                        \
+        }                                                                   \
+        shared_ptr_ctrlblk* temp_ctrl = malloc(sizeof(shared_ptr_ctrlblk)); \
+        *temp_ctrl = { .nshared = 1, .nweak = 1 };                          \
+        return (T##_shared_ptr){ .};                                        \
     }
 
 
