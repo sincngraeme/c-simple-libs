@@ -2,11 +2,15 @@
 #define SMRTPTR_IMPLEMENTATION
 
 #define INIT_SOLE_PTR
+#define INIT_SHARED_PTR
 #define ACCESS_PTR_REGISTRY \
     REGISTER_ACCESS_PTR(int, group1)
+
 #define SHARED_PTR_TYPE_LIST \
     SHARED_PTR_DERIVE(int)
+
 #include "../csl-smrtptrs.h"
+
 
 int main() {
     {

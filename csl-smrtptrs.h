@@ -3,6 +3,43 @@
 
 #ifdef SMRTPTR_IMPLEMENTATION
 
+enum smrtptr_types {
+    // UNIQUE_PTR,
+    // SOLE_PTR,
+    // ACCCESS_PTR,
+    WEAK_PTR,
+    SHARED_PTR,
+    // SHARED_PTR_ATOMIC,
+};
+
+enum smrtptr_errors {
+    SMRTPTR_INVALID_TYPE = 1,
+    // SMRTPTR_ATTEMPTED_DIRECT_ASSIGNMENT
+    SMRTPTR_MAKE_RECIEVED_NULL,
+};
+
+[[no_return]] void smrtptr_log_error(enum smrtptr_errors code) {
+    switch(code) {
+        case SMRTPTR_ATTEMPTED_DIRECT_ASSIGNMENT: {
+            fprintf(stderr, "ERROR: Attempted direct assignment of shared_ptr");
+            exit(SMRTPTR_ATTEMPTED_DIRECT_ASSIGNMENT);
+        }
+        case SMRTPTR_MAKE_RECIEVED_NULL: {
+            fprintf(stderr, "ERROR: make_smrtptr recieved NULL pointer");
+            exit(SMRTPTR_MAKE_RECIEVED_NULL);
+        }
+        case SMRTPTR_INVALID_TYPE: {
+            fprintf(stderr, "ERROR: Invalid smrtptr type. must be of type 'enum smrtptr_types'\n");
+            exit(SMRTPTR_INVALID_TYPE); 
+        }
+        default: {
+            fprintf(stderr, "ERROR: Unknown code");
+            exit(-1);
+        }
+    }
+}
+
+
 /* @brief:  This is called implicitly at the end of the scope and does not require
  * any reference management. do not assign to a raw ptr except as a function argument */
 void free_unique_ptr(void* smrtptr) {
@@ -91,34 +128,49 @@ typedef struct {
     unsigned int nweak;
 } shared_ptr_ctrlblk;
 
+
 #define SHARED_PTR_DERIVE(T) \
     typedef struct { \
         T* ptr; \
         shared_ptr_ctrlblk* ctrl; \
     } T##_shared_ptr; \
-    void shared_ref_shared_ptr(void* smrtptr) {
-    \
+    [[nodiscard]] T##_shared_ptr make_shared_ptr(void* ptr) {               \
+        if(ptr == NULL) {                                                   \
+            smrtptr_log_error(SMRTPTR_MAKE_RECIEVED_NULL);                  \
+        }                                                                   \
+        shared_ptr_ctrlblk* temp_ctrl = malloc(sizeof(shared_ptr_ctrlblk)); \
+        *temp_ctrl = (shared_ptr_ctrlblk){ .nshared = 1, .nweak = 1 };      \
+        return (T##_shared_ptr){ .ptr = ptr, .ctrl = temp_ctrl };           \
     } \
-    void weak_ref_shared_ptr(void* smrtptr) { \
-    \
+    T##_shared_ptr clone_##T##_shared_ptr(T##_shared_ptr ptr) { \
+        switch(type) {                                                                                  \
+            case SHARED_PTR: {                                                                          \
+                ptr.ctrl->nshared--;                                                                   \
+            }                                                                                           \
+            case WEAK_PTR: {                                                                            \
+               ptr.ctrl->nweak--;                                                                     \
+            }                                                                                           \
+            default: {                                                                                  \
+                smrtptr_log_error(SMRTPTR_INVALID_TYPE); \
+            } \
+        } \
+        return ptr; \
     } \
-    void free_shared_ptr(void* smrtptr) { \
-    \
-    }
-    T##_shared_ptr make_shared_ptr(void* ptr) {
-        if(ptr == NULL) {
-            fprintf(stderr, "ERROR: make_shared_ptr recieved NULL ptr\n");
-            exit(1);
-        }
-        shared_ptr_ctrlblk* temp_ctrl = malloc(sizeof(shared_ptr_ctrlblk));
-        *temp_ctrl = { .nshared = 1, .nweak = 1 };
-        return (T##_shared_ptr){ .};
+    T##_shared_ptr free_##T##_shared_ptr(T##_shared_ptr* ptr) { \
     }
 
+SHARED_PTR_TYPE_LIST
 
-// #define shared_ptr(T) shared_ptr_ptr
-// #define shared_ptr_ptr(p)
-#define shared_ptr(T) __attribute__((cleanup(free_shared_ptr))) struct { T* ptr; shared_ptr_ctrlblk* ctrl; }
+#define shared_ptr(T) \
+    _Pragma("GCC diagnostic push") \
+    _Pragma("GCC diagnostic ignored \"-Wignored-attributes\"") \
+    __attribute__((cleanup(free_##T##_shared_ptr))) T##_shared_ptr \
+    _Pragma("GCC diagnostic pop")
+
+#undef SHARED_PTR_DERIVE
+#define SHARED_PTR_DERIVE(T) , T: clone_##T##_shared_ptr
+
+#define clone_shared_ptr(ptr) _Generic(typeof(ptr) SHARED_PTR_TYPE_LIST )(ptr)
 
 #endif
 
