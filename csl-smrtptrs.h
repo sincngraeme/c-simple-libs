@@ -10,7 +10,12 @@ void free_unique_ptr(void* smrtptr) {
     free(*_smrtptr);
 }
 /* @brief: Creates a unique_ptr */
-#define unique_ptr(T) __attribute__((cleanup(free_unique_ptr))) T*
+#define unique_ptr(T) \
+    typedef T* unique_ptr_##T; \
+    _Pragma("GCC diagnostic push") \
+    _Pragma("GCC diagnostic ignored \"-Wignored-attributes\"") \
+    __attribute__((cleanup(free_unique_ptr))) unique_ptr_##T \
+    _Pragma("GCC diagnostic pop")
 
 #ifdef INIT_SOLE_PTR
 
@@ -40,6 +45,9 @@ void free_sole_ptr(void* smrtptr) {
 
 #endif
 
+
+#ifdef ACCESS_PTR_REGISTRY
+
 /* @brief:  Frees an access ptr once the reference count becomes 0 */
 void free_access_ptr(void* smrtptr) {
     void** _smrtptr = (void**)smrtptr;
@@ -51,8 +59,6 @@ void free_access_ptr(void* smrtptr) {
 #define access_ptr(T, group_name)                               \
     create_##group_name##_access_ptr();                         \
     __attribute__((cleanup(free_##group_name##_access_ptr))) T*
-
-#ifdef ACCESS_PTR_REGISTRY
 
 /* Generate struct definition */
 #define REGISTER_ACCESS_PTR(T, group_name) unsigned int group_name;
