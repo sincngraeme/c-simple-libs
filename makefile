@@ -2,8 +2,8 @@ CC = gcc
 OUTDIR = bin
 BUILDDIR = .
 PATHSEP = /
-CFLAGS = -Wall -Wextra -g #-fsanitize=address -O1
-LFLAGS = #-fsanitize=address
+CFLAGS = -Wall -Wextra -g -fsanitize=address -O1
+LFLAGS = -fsanitize=address
 STD = gnu2x
 SRC = ./test/smrtptrs.c
 OBJ = $(SRC:.c=.o)
