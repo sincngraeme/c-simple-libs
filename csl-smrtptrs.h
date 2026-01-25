@@ -14,12 +14,12 @@
 
 
 enum smrtptr_types {
-    // UNIQUE_PTR,
+    UNIQUE_PTR,
     // SOLE_PTR,
     // ACCCESS_PTR,
     WEAK_PTR,
     SHARED_PTR,
-    // SHARED_PTR_ATOMIC,
+    SHARED_PTR_ATOMIC,
 };
 
 enum smrtptr_errors {
@@ -226,6 +226,8 @@ SHARED_PTR_TYPE_LIST
 #define shared_ptr(T) __attribute__((cleanup(free_##T##_shared_ptr))) T##_shared_ptr
 #define clone_shared_ptr(ptr, type) _Generic(ptr SHARED_PTR_TYPE_LIST)(ptr, type)
 #define make_shared_ptr(T, ptr)  make_##T##_shared_ptr(ptr) 
+#define deref_shared_ptr(smrtptr) *smrtptr.ptr
+#define get_shared_ptr(smrtptr) smrtptr.ptr
 
 #endif
 #endif
