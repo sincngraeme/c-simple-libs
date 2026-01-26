@@ -159,7 +159,6 @@ typedef struct {
 #define SHARED_PTR_DERIVE(T, free_fn)                                       \
     typedef struct {                                                        \
         T *ptr;                                                             \
-        enum smrtptr_types type;                                            \
         shared_ptr_ctrlblk *ctrl;                                           \
     } T##_shared_ptr;                                                       \
     \
@@ -176,7 +175,6 @@ typedef struct {
         return (T##_shared_ptr){                                            \
             .ptr = ptr,                                                     \
             .ctrl = temp_ctrl,                                              \
-            .type = SHARED_PTR                                              \
         };                                                                  \
     }                                                                       \
     \
@@ -197,25 +195,42 @@ typedef struct {
                 smrtptr_log_error(SMRTPTR_INVALID_TYPE);                    \
             }                                                               \
         }                                                                   \
-        ptr.type = type;                                                    \
         return ptr;                                                         \
     }                                                                       \
     \
     void free_##T##_shared_ptr(T##_shared_ptr *ptr) {                       \
         if(ptr->ctrl == NULL) smrtptr_log_error(SMRTPTR_NULL_CTRL_BLOCK);   \
-        switch(ptr->type) {                                                 \
-            case SHARED_PTR:                                                \
-                ptr->ctrl->nshared--;                                       \
-                break;                                                      \
-            case WEAK_PTR:                                                  \
-                ptr->ctrl->nweak--;                                         \
-                break;                                                      \
-            default: smrtptr_log_error(SMRTPTR_INVALID_TYPE);               \
-        }                                                                   \
-        if(ptr->ctrl->nshared == 0) {                                       \
-            ptr->ctrl->destructor(ptr->ptr);                                \
-            if(ptr->ctrl->nweak == 0) free(ptr->ctrl);                      \
-        }                                                                   \
+        ptr->ctrl->nshared--;                                               \
+        if(ptr->ctrl->nshared == 0) ptr->ctrl->destructor(ptr->ptr);        \
+    }
+
+SHARED_PTR_TYPE_LIST
+
+
+/* Weak pointers (are implemented for any type that shared ptr is implemented for) */
+#undef SHARED_PTR_DERIVE
+#define SHARED_PTR_DERIVE(T, unused)                                            \
+    typedef struct {                                                            \
+        T* ptr;                                                                 \
+        shared_ptr_ctrlblk* ctrl;                                               \
+    } T##_weak_ptr;                                                             \
+\
+    [[nodiscard]] T##_weak_ptr clone_##T##_weak_ptr(T##_weak_ptr ptr) {         \
+        ptr.ctrl->nweak++;                                                      \
+        return ptr;                                                             \
+    }                                                                           \
+\
+    [[nodiscard]] T##_shared_ptr access_##T##_weak_ptr(T##_weak_ptr ptr) {      \
+        if(ptr.ctrl->nshared > 0) {                                             \
+            ptr.ctrl->nshared++;                                                \
+            return (T##_shared_ptr){ .ptr = ptr.ptr, .ctrl = ptr.ctrl };        \
+        }                                                                       \
+        return (T##_shared_ptr){0};                                             \
+    }                                                                           \
+\
+    void free_##T##_weak_ptr(T##_weak_ptr* ptr) {                               \
+        ptr->ctrl->nweak--;                                                     \
+        if(ptr->ctrl->nshared == 0 && ptr->ctrl->nweak == 0) free(ptr->ctrl);   \
     }
 
 SHARED_PTR_TYPE_LIST
@@ -227,7 +242,7 @@ SHARED_PTR_TYPE_LIST
 #define clone_shared_ptr(ptr, type) _Generic(ptr SHARED_PTR_TYPE_LIST)(ptr, type)
 #define make_shared_ptr(T, ptr)  make_##T##_shared_ptr(ptr) 
 #define deref_shared_ptr(smrtptr) *smrtptr.ptr
-#define get_shared_ptr(smrtptr) smrtptr.ptr
+#define shared_ptr_raw(smrtptr) smrtptr.ptr
 
 #endif
 #endif
