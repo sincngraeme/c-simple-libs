@@ -26,40 +26,21 @@ void close_file(void* void_fp) {
 #include "../csl-smrtptrs.h"
 
 int main() {
-    {
-        unique_ptr(int) ptr1 = malloc(sizeof(int));
-        *ptr1 = 1;
-        printf("ptr1: %d\n", *ptr1);
-    }
-    {
-        sole_ptr(int) ptr2 = malloc(sizeof(int));
-        *ptr2 = 2;
-        printf("ptr2: %d\n", *ptr2);
-        {
-            sole_ptr(int) ptr3 = ptr2;
-            printf("ptr2: %d\n", *ptr2);
-            printf("ptr3: %d\n", *ptr3);
-        }
-        printf("ptr2: %d\n", *ptr2);
-    }
-    {
-        access_ptr(int, group1) ptr4 = malloc(sizeof(int));
-        *ptr4 = 4;
-        printf("ptr4: %d\n", *ptr4);
-        {
-            access_ptr(int, group1) ptr5 = ptr4;
-            printf("ptr4: %d\n", *ptr4);
-            printf("ptr5: %d\n", *ptr5);
-        }
-        printf("ptr4: %d\n", *ptr4);
-    }
+    // {
+    //     unique_ptr(int) ptr1 = malloc(sizeof(int));
+    //     *ptr1 = 1;
+    //     printf("ptr1: %d\n", *ptr1);
+    // }
     {
         // Shared ptr
         shared_ptr(int) ptr6 = make_shared_ptr(int, malloc(sizeof(int)));
         deref_shared_ptr(ptr6) = 10;
         printf("ptr6: %d\n", deref_shared_ptr(ptr6));
         {
-            shared_ptr(int) ptr7 = clone_shared_ptr(ptr6, SHARED_PTR);
+            shared_ptr(int) ptr7 = clone_smrtptr(ptr6, SHARED_PTR);
+            if(weak_ptr(int) ptr8 = clone_smrtptr(ptr6, WEAK_PTR)) {
+                
+            }
             printf("ptr7: %d\n", deref_shared_ptr(ptr6));
         }
     }
