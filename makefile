@@ -1,10 +1,10 @@
 CC = gcc
-OUTDIR = bin
+OUTDIR = ./bin
 BUILDDIR = .
 PATHSEP = /
-CFLAGS = -Wall -Wextra -g
 STD = gnu2x
-SRC = ./test/enums.c
+CFLAGS = -Wall -Wextra -g -std=$(STD)
+SRC = test/pretty-print.c
 HDR = csl-enums.h
 OBJ = $(SRC:.c=.o)
 ARGS = #fake.file -sS --custom-message="General Kenobi!"
@@ -16,7 +16,7 @@ all: $(OBJ)
 
 # Compile
 $(OBJ): $(SRC)
-	$(CC) $(CFLAGS) -std=$(STD) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OUTDIR)$(PATHSEP)$(PROGRAM) $(OBJ)
