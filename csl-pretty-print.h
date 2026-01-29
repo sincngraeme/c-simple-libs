@@ -6,6 +6,10 @@
 
 #define PPRINT_BUFSIZE 256
 
+#ifndef PPRINT_FMTS
+#define PPRINT_FMTS
+#endif
+
 #define PRINTP_FMT_ENTRY(arg) , _Generic((arg), PRETTY_PRINT_TYPES, default: "%p")
 #define printp(...)                                                 \
     printf(make_format(                                             \
@@ -40,4 +44,5 @@ static const char* make_format(unsigned int bufsize, char buffer[bufsize], const
         double: "%f", \
         char : "%c", \
         char *: "%s", \
-        const char *: "%s"
+        const char *: "%s" \
+        PPRINT_FMTS
