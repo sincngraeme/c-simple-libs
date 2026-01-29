@@ -21,11 +21,11 @@ void close_file(void* void_fp) {
 #include "../csl-smrtptrs.h"
 
 int main() {
-    // {
-    //     unique_ptr(int) ptr1 = malloc(sizeof(int));
-    //     *ptr1 = 1;
-    //     printf("ptr1: %d\n", *ptr1);
-    // }
+    {
+        unique_ptr(int) ptr1 = malloc(sizeof(int));
+        *ptr1 = 1;
+        printf("ptr1: %d\n", *ptr1);
+    }
     {
         // Shared ptr
         shared_ptr(int) ptr2 = make_shared_ptr(int, malloc(sizeof(int)));

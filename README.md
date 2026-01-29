@@ -30,6 +30,7 @@ with their use on Windows. I cannot speak to these libraries compatibility with 
 - [csl-match](#csl-match.h)
 - [csl-recursed](#csl-recursed.h)
 - [csl-templates](#csl-templates.h)
+- [csl-smrtptrs](#csl-smrtptrs.h)
 
 ## csl-errval (GNU Extended)
 
@@ -480,3 +481,190 @@ As you can see above, the example template function above generates two function
 >    return 0;
 >}
 >```
+
+## csl-smrtptrs.h
+
+This module provides `C++`-like smart pointers to C! There are multiple pointer types.
+
+1. `unique_ptr(T)`
+2. `shared_ptr(T)`
+3. `atomic_shared_ptr(T)` (Not yet implemented)
+
+If you are familiar with `C++` smart pointers these names should be familiar. They function very similarly, except this being C there are a few
+more chances for undefined behaviour.
+
+Caveat: This module depends on a GNU specific attribute (`__attribute((cleanup(<function>)))`). This means that only clang and gcc compilers are supported. Without this feature, the cleanup functions will not run when a pointer goes out of scope. 
+
+## Usage
+
+The basic pattern for this module is this:
+1. Forward declare the `SMRTPTR_IMPLEMENTATION` macro
+2. Include `"csl-smrtptrs.h"`
+2. Derive the necessary functions for a given type.
+4. Create a pointer of a given smart pointer templated type using the base type you want to point to.
+6. (If using a shared pointer make copies)
+8. The cleanup function will run when the pointer goes out of scope, and free the memory (if certain conditions are met)
+
+### `unique_ptr(T)`
+
+Unique pointers are used for when the data is not being shared, and only needs to exist within one scope; exactly one object owns the data. 
+
+```c
+{ /* This scope defines the lifetime */
+    unique_ptr(int) = malloc(sizeof(int));
+    *int = 10;
+    printf("My Int: %d\n", *int);
+} /* cleanup function is called here and frees the memory */
+```
+
+In the example above `unique_ptr(int)` expands to:
+
+```c
+__attribute__((cleanup(free_int_unique_ptr))) int_unique_ptr
+```
+
+This cleanup function must be defined before the `unique_ptr` can be used. To do this you must define an "X-macro" of the name
+"`UNIQUE_PTR_TYPE_LIST`".
+
+```c
+#define UNIQUE_PTR_TYPE_LIST \
+    UNIQUE_PTR_DERIVE(int, free) \
+    UNIQUE_PTR_DERIVE(char, free)
+```
+
+This will derive the necessary code from the templates for the given type (argument 1). Argument 2 is a function pointer of type `void (*)(void *)` Which will be used to free the memory when the cleanup function is called. Since our above example used `malloc` to allocate the memory, we must use free to free it. If you have a pointer to a type which must be freed with a different function (for example a file pointer, `FILE*`, must be freed with `fclose()`), you must specify it here.
+
+For the example of a file pointer, `fclose` is not compatible with the type `void (*)(void*)`. Therefore, you must define a wrapper function with
+this type and call that.
+
+```c
+#define UNIQUE_PTR_TYPE_LIST \
+    UNIQUE_PTR_DERIVE(FILE, close_file)
+
+#include "csl-smrtptrs.h"
+
+void close_file(void* fp) {
+    FILE* fp = void_fp;
+    if(fclose(fp) == EOF) {
+        fprintf(stderr, "ERROR: Failed to close file\n");
+        exit(EOF);
+    }
+}
+```
+
+Now we are ready to use the `unique_ptr(FILE)` type!
+
+```c
+
+int main() {
+    {
+        unique_ptr(FILE) fp = fopen("test.txt", "a");
+        if(fp == NULL) {
+            fprintf(stderr, "ERROR: Failed to open file\n");
+            exit(-1);
+        } else {
+            printf("File successfully opened!\n");
+            if(fputs("Hello there!\n", fp) == 0) {
+                fprintf(stderr, "ERROR: Failed to write to file\n");
+                return -1;
+            };
+            printf("File successfully written to!\n");
+        }
+    }
+    {
+        unique_ptr(FILE) fp = fopen("test.txt", "r");
+        char buf[256] = {0};
+        if(fp == NULL) {
+            fprintf(stderr, "ERROR: Failed to open file\n");
+            exit(-1);
+        } else {
+            printf("File successfully opened!\n");
+            for(int i = 0; fgets(buf, 256, fp) != NULL; i++) printf("%d | %s", i, buf);
+            printf("File successfully read from!\n");
+        }
+    }
+}
+
+```
+
+Assuming the file could be opened, this will write a new line to the file and then read out the entire file. `fclose` is implicitly called via `close_file` using the cleanup attribute when each scope ends.
+
+## `shared_ptr(T)`
+
+Shared pointers are for when the ownership of the data must be shared. Unique pointers are not suitable for this because the data is freed as soon
+as the first `unique_ptr` goes out of scope. This is undefined behaviour. In `C++` an attempt to copy a `unique_ptr` results in a compiler error.
+That is not the case here because `C` does not have copy constructors or operator overloading. It is therefore up to the programmer to ensure they
+do not attempt to clone a unique pointer, or assign it directly to a raw pointer.
+
+Unlike `unique_ptr`, `shared_ptr` is a compound type:
+
+```c
+typedef struct {
+    T *ptr;
+    shared_ptr_ctrlblk *ctrl;
+} T##_shared_ptr;
+```
+
+This means that direct assignment to a raw pointer or dereferencing is not possible. The basics of how `shared_ptr` works is as follows:
+- Creation of a pointer is handled with `make_shared_ptr` (this initializes the reference counts and allocates the control block).
+- Cloning of a pointer is handled with `clone_smrtptr` (this increments the reference count for the corresponding reference type).
+- The freeing function is called at the end of each scope and only frees the data once the shared reference count goes to 0.
+    - The control block is freed once the weak reference count is also 0.
+
+>[!warning]
+>`shared_ptr_ctrlblk` does not use atomic reference counting and is therefor not thread safe. For thread safety you must use `atomic_shared_ptr`
+>which has not yet been implemented.
+
+### `make_shared_ptr(T, ptr)`
+
+`make_shared_ptr` takes 2 arguments:
+1. T: the type of the pointer you wish to create
+2. ptr: the pointer to the data you are allocating.
+
+This means that the shared pointers are "allocator agnostic" and you can use whatever allocator/deallocator functions you want.
+
+```c
+/* Allocate space for an integer on the heap and store it in a shared_ptr to an integer */
+shared_ptr(int) ptr = make_shared_ptr(int, malloc(sizeof(int)));
+```
+
+This is not the same as cloning. With cloning the smart pointer has already been allocated. Attempting to clone a raw pointer is invalid.
+
+### `clone_smrtptr(ptr, PTR_TYPE)`
+
+`clone_smrtptr` takes 2 arguments:
+1. The `smrtptr` you wish to clone.
+2. The type of that pointer. (Valid values are `SHARED_PTR` and `WEAK_PTR`). 
+
+```c
+shared_ptr(int) ptr1 = clone_smrtptr(ptr, SHARED_PTR);
+```
+
+In the above example, `ptr` is a shared pointer, and we are creating another shared pointer, `ptr1`, which references the same data and shares
+ownership with `ptr`. Thus, if one goes out of scope, it will free the data only if it is the only remaining owning reference (`shared_ptr`) to
+that data.
+
+However, sometimes we do not want to have our reference take ownership of the data such as to prevent cyclical references which prevent the data
+from being freed. In this case, a `weak_ptr` must be used.
+
+`clone_smrtptr` can also create a `weak_ptr` to the data, if passed `WEAK_PTR` as the pointer type. 
+
+```c
+weak_ptr(int) ptr3 = clone_smrtptr(ptr, WEAK_PTR);
+```
+
+In this case, `ptr` is still a shared pointer, so a weak (non-owning) reference to the same data is created and stored in `ptr3`, and `ptr` still
+has ownership of the data. Since `ptr3` is a non-owning reference, if we want to access the data, we need to first check if it still exists.
+
+```c
+if(is_ptr_dead(ptr3)) {
+    printf("ptr3: %d\n", deref_smrtptr(ptr3)); /* Reading */
+}
+```
+
+Therefore, we do not try to access the data unless it is still valid. Attempting to access the data stored in a weak pointer without this check is undefined behaviour.
+
+>[!warning]
+>At the moment there are no type checks performed in `deref_smrtptr()` meaning there is nothing to stop you from dereferencing an invalid
+>weak_pointer. This will be implemented, but for now it is up to the programmer to ensure they check if a weak pointer is valid before they access
+>its data.
