@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+
 #define SMRTPTR_IMPLEMENTATION
 
-#define INIT_SOLE_PTR
-#define INIT_SHARED_PTR
-#define ACCESS_PTR_REGISTRY \
-    REGISTER_ACCESS_PTR(int, group1)
+#define UNIQUE_PTR_TYPE_LIST \
+    UNIQUE_PTR_DERIVE(int, free) \
+    UNIQUE_PTR_DERIVE(FILE, close_file)
+
+#define SHARED_PTR_TYPE_LIST \
+    SHARED_PTR_DERIVE(int, free)
 
 void close_file(void* void_fp) {
     FILE* fp = void_fp;
@@ -14,14 +17,6 @@ void close_file(void* void_fp) {
         exit(EOF);
     }
 }
-
-#define UNIQUE_PTR_TYPE_LIST \
-    UNIQUE_PTR_DERIVE(int, free) \
-    UNIQUE_PTR_DERIVE(FILE, close_file)
-
-
-#define SHARED_PTR_TYPE_LIST \
-    SHARED_PTR_DERIVE(int, free)
 
 #include "../csl-smrtptrs.h"
 
@@ -33,15 +28,19 @@ int main() {
     // }
     {
         // Shared ptr
-        shared_ptr(int) ptr6 = make_shared_ptr(int, malloc(sizeof(int)));
-        deref_shared_ptr(ptr6) = 10;
-        printf("ptr6: %d\n", deref_shared_ptr(ptr6));
+        shared_ptr(int) ptr2 = make_shared_ptr(int, malloc(sizeof(int)));
+        deref_smrtptr(ptr2) = 10;
+        printf("ptr6: %d\n", deref_smrtptr(ptr2));
         {
-            shared_ptr(int) ptr7 = clone_smrtptr(ptr6, SHARED_PTR);
-            if(weak_ptr(int) ptr8 = clone_smrtptr(ptr6, WEAK_PTR)) {
-                
+            shared_ptr(int) ptr3 = clone_smrtptr(ptr2, SHARED_PTR);
+            { /* Create a weak_ptr */
+                weak_ptr(int) ptr4 = clone_smrtptr(ptr3, WEAK_PTR);
+                weak_ptr(int) ptr5 = clone_smrtptr(ptr4, WEAK_PTR);
+                if(is_ptr_dead(ptr4)) {
+                    printf("ptr8: %d\n", deref_smrtptr(ptr4)); /* Reading */
+                }
             }
-            printf("ptr7: %d\n", deref_shared_ptr(ptr6));
+            printf("ptr7: %d\n", deref_smrtptr(ptr2));
         }
     }
     {
