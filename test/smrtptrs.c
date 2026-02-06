@@ -22,22 +22,24 @@ void close_file(void* void_fp) {
 
 int main() {
     {
-        unique_ptr(int) ptr1 = malloc(sizeof(int));
-        *ptr1 = 1;
-        printf("ptr1: %d\n", *ptr1);
+        unique_ptr(int) ptr1 = make_unique_ptr(int, malloc(sizeof(int)), free);
+        deref_smrtptr(ptr1) = 1;
+        printf("ptr1: %d\n", *ptr1.ptr);
     }
     {
         // Shared ptr
-        shared_ptr(int) ptr2 = make_shared_ptr(int, malloc(sizeof(int)));
+        shared_ptr(int) ptr2 = make_shared_ptr(int, malloc(sizeof(int)), free);
         deref_smrtptr(ptr2) = 10;
         printf("ptr6: %d\n", deref_smrtptr(ptr2));
         {
-            shared_ptr(int) ptr3 = clone_smrtptr(ptr2, SHARED_PTR);
+            shared_ptr(int) ptr3 = clone_shared_ptr(int, ptr2, SHARED_PTR);
             { /* Create a weak_ptr */
-                weak_ptr(int) ptr4 = clone_smrtptr(ptr3, WEAK_PTR);
-                weak_ptr(int) ptr5 = clone_smrtptr(ptr4, WEAK_PTR);
-                if(is_ptr_dead(ptr4)) {
-                    printf("ptr8: %d\n", deref_smrtptr(ptr4)); /* Reading */
+                weak_ptr(int) ptr4 = clone_shared_ptr(int, ptr3, WEAK_PTR);
+                weak_ptr(int) ptr5 = clone_weak_ptr(int, ptr4, WEAK_PTR);
+                { shared_ptr(int) ptr6;
+                    if( is_ptr_dead(ptr6 = clone_weak_ptr(int, ptr4, SHARED_PTR)) ) {
+                        printf("ptr8: %d\n", deref_smrtptr(ptr6)); /* Reading */
+                    }
                 }
             }
             printf("ptr7: %d\n", deref_smrtptr(ptr2));
@@ -45,13 +47,13 @@ int main() {
     }
     {
         // File IO
-        unique_ptr(FILE) fp = fopen("test.txt", "a");
-        if(fp == NULL) {
+        unique_ptr(FILE) fp = make_unique_ptr(FILE, fopen("test.txt", "a"), close_file);
+        if(fp.ptr == NULL) {
             fprintf(stderr, "ERROR: Failed to open file\n");
             exit(-1);
         } else {
             printf("File successfully opened!\n");
-            if(fputs("Hello there!\n", fp) == 0) {
+            if(fputs("Hello there!\n", fp.ptr) == 0) {
                 fprintf(stderr, "ERROR: Failed to write to file\n");
                 return -1;
             };
@@ -60,14 +62,14 @@ int main() {
     }
     {
         // File IO
-        unique_ptr(FILE) fp = fopen("test.txt", "r");
+        unique_ptr(FILE) fp = make_unique_ptr(FILE, fopen("test.txt", "r"), close_file);
         char buf[256] = {0};
-        if(fp == NULL) {
+        if(fp.ptr == NULL) {
             fprintf(stderr, "ERROR: Failed to open file\n");
             exit(-1);
         } else {
             printf("File successfully opened!\n");
-            for(int i = 0; fgets(buf, 256, fp) != NULL; i++) printf("%d | %s", i, buf);
+            for(int i = 0; fgets(buf, 256, fp.ptr) != NULL; i++) printf("%d | %s", i, buf);
             printf("File successfully read from!\n");
         }
     }
