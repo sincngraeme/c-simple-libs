@@ -69,17 +69,13 @@ int main() {
                 if(smrtptr_errno) return smrtptr_errno;
                 { 
                     smrtptr_strong_atomic(int) ptr11;
-                    if( smrtptr_lock_weak_atomic(
-                            ptr11 = smrtptr_clone_weak_atomic(int, ptr9, SMRTPTR_STRONG_ATOMIC))
-                    ) {
+                    if( smrtptr_lock_weak_atomic(int, ptr11, ptr9) ) {
                         printf("ptr11: %d\n", deref_smrtptr(ptr11)); /* Reading */
                     }
                 }
                 { 
                     smrtptr_strong_atomic(int) ptr12;
-                    if( smrtptr_lock_weak_atomic(
-                            ptr12 = smrtptr_clone_weak_atomic(int, ptr10, SMRTPTR_STRONG_ATOMIC))
-                    ) {
+                    if( smrtptr_lock_weak_atomic(int, ptr12, ptr10)) {
                         printf("ptr12: %d\n", deref_smrtptr(ptr12)); /* Reading */
                     }
                 }

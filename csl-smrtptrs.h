@@ -413,7 +413,7 @@ __attribute__((unused)) static void smrtptr_free_weak_atomic(void* ptr) {
 }
 
 __attribute__((unused))
-static union smrtptr_strong_atomic_types smrtptr_lock_weak_atomic(
+static union smrtptr_strong_atomic_types _smrtptr_lock_weak_atomic(
     union smrtptr_weak_atomic_types ptr
 ) {
     size_t nrefs;
@@ -440,9 +440,8 @@ static union smrtptr_strong_atomic_types smrtptr_lock_weak_atomic(
 #define smrtptr_make_strong_atomic(T, alloc, dealloc)  _smrtptr_make_strong_atomic(alloc, dealloc)._is_##T 
 #define smrtptr_clone_strong_atomic(T, ptr, type) _smrtptr_clone_strong_atomic((union smrtptr_strong_atomic_types)ptr, type).IS_##type._is_##T
 #define smrtptr_clone_weak_atomic(T, ptr, type) _smrtptr_clone_weak_atomic((union smrtptr_weak_atomic_types)ptr, type).IS_##type._is_##T
-#define deref_smrtptr(smrtptr) *smrtptr.ptr
-#define ref_smrtptr(smrtptr) smrtptr.ptr
-#define smrtptr_lock_weak_atomic(smrtptr) (smrtptr).ctrl != NULL
+#define smrtptr_lock_weak_atomic(T, strong, weak) \
+    (strong = _smrtptr_lock_weak_atomic((union smrtptr_weak_atomic_types)weak)._is_##T).ctrl != NULL
 
 #endif // }}}
 
