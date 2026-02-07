@@ -3,12 +3,15 @@
 
 #define SMRTPTR_IMPLEMENTATION
 
-#define UNIQUE_PTR_TYPE_LIST \
-    UNIQUE_PTR_DERIVE(int, free) \
-    UNIQUE_PTR_DERIVE(FILE, close_file)
+#define SMRTPTR_UNIQUE_TYPE_LIST \
+    SMRTPTR_UNIQUE_DERIVE(int, free) \
+    SMRTPTR_UNIQUE_DERIVE(FILE, close_file)
 
 #define SHARED_PTR_TYPE_LIST \
     SHARED_PTR_DERIVE(int, free)
+
+#define SMRTPTR_SHARED_ATOMIC_TYPE_LIST \
+    SMRTPTR_DERIVE_SHARED_ATOMIC(int, free)
 
 void close_file(void* void_fp) {
     FILE* fp = void_fp;
@@ -22,32 +25,72 @@ void close_file(void* void_fp) {
 
 int main() {
     {
-        unique_ptr(int) ptr1 = make_unique_ptr(int, malloc(sizeof(int)), free);
+        smrtptr_unique(int) ptr1 = make_smrtptr_unique(int, malloc(sizeof(int)), free);
         deref_smrtptr(ptr1) = 1;
         printf("ptr1: %d\n", *ptr1.ptr);
     }
     {
         // Shared ptr
-        shared_ptr(int) ptr2 = make_shared_ptr(int, malloc(sizeof(int)), free);
+        smrtptr_strong(int) ptr2 = smrtptr_make_strong(int, malloc(sizeof(int)), free);
+        if(smrtptr_errno) return smrtptr_errno;
         deref_smrtptr(ptr2) = 10;
-        printf("ptr6: %d\n", deref_smrtptr(ptr2));
+        printf("ptr2: %d\n", deref_smrtptr(ptr2));
         {
-            shared_ptr(int) ptr3 = clone_shared_ptr(int, ptr2, SHARED_PTR);
-            { /* Create a weak_ptr */
-                weak_ptr(int) ptr4 = clone_shared_ptr(int, ptr3, WEAK_PTR);
-                weak_ptr(int) ptr5 = clone_weak_ptr(int, ptr4, WEAK_PTR);
-                { shared_ptr(int) ptr6;
-                    if( is_ptr_dead(ptr6 = clone_weak_ptr(int, ptr4, SHARED_PTR)) ) {
-                        printf("ptr8: %d\n", deref_smrtptr(ptr6)); /* Reading */
+            smrtptr_strong(int) ptr3 = smrtptr_clone_strong(int, ptr2, SMRTPTR_STRONG);
+            if(smrtptr_errno) return smrtptr_errno;
+            { /* Create a smrtptr_weak */
+                smrtptr_weak(int) ptr4 = smrtptr_clone_strong(int, ptr3, SMRTPTR_WEAK);
+                if(smrtptr_errno) return smrtptr_errno;
+                smrtptr_weak(int) ptr5 = smrtptr_clone_weak(int, ptr4, SMRTPTR_WEAK);
+                if(smrtptr_errno) return smrtptr_errno;
+                { 
+                    smrtptr_strong(int) ptr6;
+                    if( is_ptr_alive(ptr6 = smrtptr_clone_weak(int, ptr4, SMRTPTR_STRONG)) ) {
+                        printf("ptr6: %d\n", deref_smrtptr(ptr6)); /* Reading */
                     }
                 }
             }
-            printf("ptr7: %d\n", deref_smrtptr(ptr2));
+            printf("ptr2: %d\n", deref_smrtptr(ptr2));
+        }
+    }
+    {
+        // Atomic Shared ptrs
+        smrtptr_strong_atomic(int) ptr7 = smrtptr_make_strong_atomic(int, malloc(sizeof(int)), free);
+        if(smrtptr_errno) return smrtptr_errno;
+        deref_smrtptr(ptr7) = 10;
+        printf("ptr7: %d\n", deref_smrtptr(ptr7));
+        {
+            smrtptr_strong_atomic(int) ptr8 = smrtptr_clone_strong_atomic(int, ptr7, SMRTPTR_STRONG_ATOMIC);
+            if(smrtptr_errno) return smrtptr_errno;
+            { /* Create a smrtptr_weak */
+                smrtptr_weak_atomic(int) ptr9 = smrtptr_clone_strong_atomic(int, ptr8, SMRTPTR_WEAK_ATOMIC);
+                if(smrtptr_errno) return smrtptr_errno;
+                smrtptr_weak_atomic(int) ptr10 = smrtptr_clone_weak_atomic(int, ptr9, SMRTPTR_WEAK_ATOMIC);
+                if(smrtptr_errno) return smrtptr_errno;
+                { 
+                    smrtptr_strong_atomic(int) ptr11;
+                    if( smrtptr_lock_weak_atomic(
+                            ptr11 = smrtptr_clone_weak_atomic(int, ptr9, SMRTPTR_STRONG_ATOMIC))
+                    ) {
+                        printf("ptr11: %d\n", deref_smrtptr(ptr11)); /* Reading */
+                    }
+                }
+                { 
+                    smrtptr_strong_atomic(int) ptr12;
+                    if( smrtptr_lock_weak_atomic(
+                            ptr12 = smrtptr_clone_weak_atomic(int, ptr10, SMRTPTR_STRONG_ATOMIC))
+                    ) {
+                        printf("ptr12: %d\n", deref_smrtptr(ptr12)); /* Reading */
+                    }
+                }
+            }
+            printf("ptr7: %d\n", deref_smrtptr(ptr7));
         }
     }
     {
         // File IO
-        unique_ptr(FILE) fp = make_unique_ptr(FILE, fopen("test.txt", "a"), close_file);
+        smrtptr_unique(FILE) fp = make_smrtptr_unique(FILE, fopen("test.txt", "a"), close_file);
+        if(smrtptr_errno) return smrtptr_errno;
         if(fp.ptr == NULL) {
             fprintf(stderr, "ERROR: Failed to open file\n");
             exit(-1);
@@ -62,7 +105,8 @@ int main() {
     }
     {
         // File IO
-        unique_ptr(FILE) fp = make_unique_ptr(FILE, fopen("test.txt", "r"), close_file);
+        smrtptr_unique(FILE) fp = make_smrtptr_unique(FILE, fopen("test.txt", "r"), close_file);
+        if(smrtptr_errno) return smrtptr_errno;
         char buf[256] = {0};
         if(fp.ptr == NULL) {
             fprintf(stderr, "ERROR: Failed to open file\n");
@@ -73,6 +117,13 @@ int main() {
             printf("File successfully read from!\n");
         }
     }
+    // {
+    //     smrtptr_strong_atomic(int) atom_ptr = smrtptr_make_strong_atomic(int, malloc(sizeof(int)), free);
+    //     deref_smrtptr(atom_ptr) = 10;
+    //     printf("Shared atomic 1: %d\n", deref_smrtptr(atom_ptr));
+    //     smrtptr_strong_atomic(int) atom_ptr2 = smrtptr_clone_strong_atomic(int, atom_ptr, SMRTPTR_STRONG_ATOMIC);
+    //     printf("Shared atomic 2: %d\n", deref_smrtptr(atom_ptr));
+    // }
     printf("Hello There!\n");
     return 0;
 }

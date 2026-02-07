@@ -3,115 +3,102 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#ifdef __cplusplus
+#error "This library is C-only. Use <memory> for C++"
+#endif
+
 #ifdef SMRTPTR_IMPLEMENTATION
 
 /* Used mainly for determining type of pointer to create when cloning */
 enum smrtptr_types {
-    UNIQUE_PTR,
-    WEAK_PTR,
-    SHARED_PTR,
-    SHARED_PTR_ATOMIC,
+    SMRTPTR_UNIQUE,
+    SMRTPTR_WEAK,
+    SMRTPTR_STRONG,
+    SMRTPTR_STRONG_ATOMIC,
+    SMRTPTR_WEAK_ATOMIC,
 };
 
 enum smrtptr_errors {
-    SMRTPTR_NOERR,
-    SMRTPTR_INVALID_TYPE,
-    SMRTPTR_MAKE_RECIEVED_NULL,
-    SMRTPTR_NULL_CTRL_BLOCK,
+    SMRTPTR_NOERR               = 0b000,
+    SMRTPTR_INVALID_TYPE        = 0b001,
+    SMRTPTR_MAKE_RECIEVED_NULL  = 0b010,
+    SMRTPTR_NULL_CTRL_BLOCK     = 0b100,
 };
 
-[[noreturn]] void smrtptr_log_error(enum smrtptr_errors code) {
-    switch (code) {
-        case SMRTPTR_MAKE_RECIEVED_NULL: {
-            fprintf(stderr, "ERROR: make_smrtptr recieved NULL pointer");
-            exit(SMRTPTR_MAKE_RECIEVED_NULL);
-        }
-        case SMRTPTR_INVALID_TYPE: {
-            fprintf(stderr, "ERROR: Invalid smrtptr type. "
-                    "must be of type 'enum smrtptr_types'\n");
-            exit(SMRTPTR_INVALID_TYPE);
-        }
-        case SMRTPTR_NULL_CTRL_BLOCK: {
-            fprintf(stderr,
-                "ERROR: Smart pointer control block was NULL\n");
-            exit(SMRTPTR_NULL_CTRL_BLOCK);
-        }
-        default: {
-            fprintf(stderr, "ERROR: Unknown code");
-            exit(-1);
-        }
-    }
-}
+static enum smrtptr_errors smrtptr_errno = 0;
 
-#ifdef UNIQUE_PTR_TYPE_LIST 
+/****************************** UNIQUE POINTERS *******************************/// {{{
+
+#ifdef SMRTPTR_UNIQUE_TYPE_LIST 
 
 typedef struct {
     void* ptr;
     void (*destructor)(void*);
-} _void_unique_ptr; 
+} _void_smrtptr_unique; 
 
-#define UNIQUE_PTR_DERIVE(T, free_fn)        \
+#define SMRTPTR_UNIQUE_DERIVE(T, free_fn)        \
     typedef struct {                \
         T* ptr;                     \
         void (*destructor)(void*);  \
-    } T##_unique_ptr; 
+    } T##_smrtptr_unique; 
 
-UNIQUE_PTR_TYPE_LIST 
-#undef UNIQUE_PTR_DERIVE
+SMRTPTR_UNIQUE_TYPE_LIST 
+#undef SMRTPTR_UNIQUE_DERIVE
 
-#define UNIQUE_PTR_DERIVE(T, free_fn) T##_unique_ptr _is_##T;
+#define SMRTPTR_UNIQUE_DERIVE(T, free_fn) T##_smrtptr_unique _is_##T;
 
 /* Generate a union which contains all unique ptr types. These will differ
  * only in the base type they contain */
-union unique_ptr_types { 
-    UNIQUE_PTR_TYPE_LIST
-    _void_unique_ptr generic;   // All types will be processed as this type (void*)
+union smrtptr_unique_types { 
+    SMRTPTR_UNIQUE_TYPE_LIST
+    _void_smrtptr_unique generic;   // All types will be processed as this type (void*)
 };
 
-UNIQUE_PTR_TYPE_LIST 
-#undef UNIQUE_PTR_DERIVE
+SMRTPTR_UNIQUE_TYPE_LIST 
+#undef SMRTPTR_UNIQUE_DERIVE
 
 /* This takes in a void ptr so it can be compatible with all smrtptr types
  * We then cast the ptr to the union which contains all types and */
-static void free_unique_ptr(void* smrtptr) {
-    union unique_ptr_types _smrtptr = *(union unique_ptr_types*)smrtptr;
+static void free_smrtptr_unique(void* smrtptr) {
+    union smrtptr_unique_types _smrtptr = *(union smrtptr_unique_types*)smrtptr;
     _smrtptr.generic.destructor(_smrtptr.generic.ptr);
 }
 
-/* @brief: unique_ptr type macro */
-#define unique_ptr(T) __attribute__(( cleanup(free_unique_ptr) )) T##_unique_ptr
-/* Calls the internal _make_unique_ptr function and specifies the return type based 
+/* @brief: smrtptr_unique type macro */
+#define smrtptr_unique(T) __attribute__(( cleanup(free_smrtptr_unique) )) T##_smrtptr_unique
+/* Calls the internal _make_smrtptr_unique function and specifies the return type based 
  * on the first parameter */
-#define make_unique_ptr(T, alloc, dealloc) _make_unique_ptr(alloc, dealloc)._is_##T
+#define make_smrtptr_unique(T, alloc, dealloc) _make_smrtptr_unique(alloc, dealloc)._is_##T
 
-static union unique_ptr_types _make_unique_ptr(void* alloc, void (*dealloc)(void*)) {
-    _void_unique_ptr smrtptr = { .ptr = NULL, .destructor = NULL };
+static union smrtptr_unique_types _make_smrtptr_unique(void* alloc, void (*dealloc)(void*)) {
+    _void_smrtptr_unique smrtptr = { .ptr = NULL, .destructor = NULL };
     if(alloc != NULL && dealloc != NULL) {
         smrtptr.ptr = alloc;
         smrtptr.destructor = dealloc;
     }
-    return (union unique_ptr_types)smrtptr;
+    return (union smrtptr_unique_types)smrtptr;
 }
 
-#endif
+#endif // }}}
+
+/******************************* SHARED POINTERS *******************************/// {{{
 
 #ifdef SHARED_PTR_TYPE_LIST
-/* True shared_ptrs like in C++ */
 
-/* The control block that is used for shared and weak pointers for all base types */
+/* The control block that is used for strong and weak pointers for all base types */
 typedef struct {
-    unsigned int nshared;
-    unsigned int nweak;
+    size_t nstrong;
+    size_t nweak;
     void (*destructor)(void*);
 } shared_ptr_ctrlblk;
 
 /* @brief:      Defines the necessary structures and unions for a the list of weak and 
- *              shared pointer types
- *                  - T##_shared_ptr: Clonable owning pointer
- *                  - T##_weak_ptr: Clonable non-owning pointer (can be promoted)
- *                  - T##_smrtptr_option: Union containing a weak or shared pointer 
+ *              strong pointer types
+ *                  - T##_smrtptr_strong: Clonable owning pointer
+ *                  - T##_smrtptr_weak: Clonable non-owning pointer (can be promoted)
+ *                  - T##_smrtptr_option: Union containing a weak or strong pointer 
  *                      - Used for generic return from cloning funcions
- * @param:      [T] - the type to derive a shared pointer type for 
+ * @param:      [T] - the type to derive a strong pointer type for 
  * @param:      [free_fn] (UNUSED): ~function pointer to the function responsible for freeing the memory
  *                      must be of type void (*)(void*)~
  */
@@ -119,12 +106,12 @@ typedef struct {
     typedef struct {                    \
         T *ptr;                         \
         shared_ptr_ctrlblk *ctrl;       \
-    } T##_shared_ptr;                   \
+    } T##_smrtptr_strong;                   \
     \
     typedef struct {                    \
         T* _ptr;                        \
         shared_ptr_ctrlblk* ctrl;       \
-    } T##_weak_ptr;                     \
+    } T##_smrtptr_weak;                     \
 
 SHARED_PTR_TYPE_LIST
 #undef SHARED_PTR_DERIVE
@@ -135,117 +122,328 @@ typedef struct {
     shared_ptr_ctrlblk* ctrl;
 } _generic_shared_ptr;
 
-#define SHARED_PTR_DERIVE(T, unused) T##_shared_ptr _is_##T;
-union shared_ptr_types {
+#define SHARED_PTR_DERIVE(T, unused) T##_smrtptr_strong _is_##T;
+union smrtptr_strong_types {
     SHARED_PTR_TYPE_LIST
     _generic_shared_ptr generic;
 };
 #undef SHARED_PTR_DERIVE
 
-#define SHARED_PTR_DERIVE(T, unused) T##_weak_ptr _is_##T;
-union weak_ptr_types {
+#define SHARED_PTR_DERIVE(T, unused) T##_smrtptr_weak _is_##T;
+union smrtptr_weak_types {
     SHARED_PTR_TYPE_LIST
     _generic_shared_ptr generic;
 };
 #undef SHARED_PTR_DERIVE
 
 typedef union {
-    union shared_ptr_types IS_SHARED_PTR;
-    union weak_ptr_types IS_WEAK_PTR;
+    union smrtptr_strong_types IS_SMRTPTR_STRONG;
+    union smrtptr_weak_types IS_SMRTPTR_WEAK;
 } shared_ptr_option;
 
-/* @brief:      Makes a shared pointer from an allocated void pointer and deallocates using the
+/* @brief:      Makes a strong pointer from an allocated void pointer and deallocates using the
  *              specified deallocator when fully out of scope 
  * @param:      void* alloc:    the pointer to *freshly* allocated memory 
  * @param:      void (*dealloc)(void*): function pointer that will be called when the pointer goes
  *              out of scope and gets freed 
  */
-[[nodiscard]] static union shared_ptr_types _make_shared_ptr(void *alloc, void (*dealloc)(void*)) {
+[[nodiscard]] static union smrtptr_strong_types _smrtptr_make_strong(void *alloc, void (*dealloc)(void*)) {
     if (alloc == NULL) {
-        smrtptr_log_error(SMRTPTR_MAKE_RECIEVED_NULL);
+        smrtptr_errno |= SMRTPTR_MAKE_RECIEVED_NULL;
+        return (union smrtptr_strong_types){0};
     }
     shared_ptr_ctrlblk *temp_ctrl = malloc(sizeof(shared_ptr_ctrlblk));
     *temp_ctrl = (shared_ptr_ctrlblk){
-        .nshared = 1,
-        .nweak = 0,
+        .nstrong = 1,
+        .nweak = 1,
         .destructor = dealloc
     };
     _generic_shared_ptr generic_ptr = {
         .ptr = alloc,
         .ctrl = temp_ctrl,
     };
-    return (union shared_ptr_types)generic_ptr;
+    return (union smrtptr_strong_types)generic_ptr;
 }
 
-/* @brief:      clones a shared pointer into a weak or shared pointer 
+/* @brief:      clones a strong pointer into a weak or strong pointer 
  * @param:      */
-[[nodiscard]] static shared_ptr_option _clone_shared_ptr(
-    union shared_ptr_types ptr,
+[[nodiscard]] static shared_ptr_option _smrtptr_clone_strong(
+    union smrtptr_strong_types ptr,
     enum smrtptr_types type
 ) {
-    if(ptr.generic.ctrl == NULL) smrtptr_log_error(SMRTPTR_NULL_CTRL_BLOCK);
+    if(ptr.generic.ctrl == NULL) {
+        smrtptr_errno |= SMRTPTR_NULL_CTRL_BLOCK;
+        return (shared_ptr_option){0};
+    }
     switch (type) {
-        case SHARED_PTR: {
-            ptr.generic.ctrl->nshared++;
+        case SMRTPTR_STRONG: {
+            ptr.generic.ctrl->nstrong++;
             break;
         }
-        case WEAK_PTR: {
+        case SMRTPTR_WEAK: {
             ptr.generic.ctrl->nweak++;
             break;
         }
         default: {
-            smrtptr_log_error(SMRTPTR_INVALID_TYPE);
+            smrtptr_errno |= SMRTPTR_INVALID_TYPE;
+            return (shared_ptr_option){0};
         }
     }
     return (shared_ptr_option)ptr;
 }
 
-static void free_shared_ptr(void* ptr) {
+static void smrtptr_free_strong(void* ptr) {
     _generic_shared_ptr* _ptr = (_generic_shared_ptr*)ptr;
-    if(_ptr->ctrl == NULL) smrtptr_log_error(SMRTPTR_NULL_CTRL_BLOCK);
-    _ptr->ctrl->nshared--;
-    if(_ptr->ctrl->nshared == 0) {
+    if(_ptr->ctrl == NULL) {
+        smrtptr_errno |= SMRTPTR_NULL_CTRL_BLOCK;
+        return;
+    }
+    if(--_ptr->ctrl->nstrong == 0) {
         _ptr->ctrl->destructor(_ptr->ptr);
-        if(_ptr->ctrl->nweak == 0) free(_ptr->ctrl);
+        if(--_ptr->ctrl->nweak == 0) free(_ptr->ctrl);
     }
 }
 
-/* Weak pointers (are implemented for any type that shared ptr is implemented for) */
-[[nodiscard]] shared_ptr_option _clone_weak_ptr(
-    union weak_ptr_types ptr,
+/* Weak pointers (are implemented for any type that strong ptr is implemented for) */
+[[nodiscard]] shared_ptr_option _smrtptr_clone_weak(
+    union smrtptr_weak_types ptr,
     enum smrtptr_types type
 ) {
     switch(type){
-        case WEAK_PTR: {
+        case SMRTPTR_WEAK: {
             ptr.generic.ctrl->nweak++;
             return (shared_ptr_option)ptr;
         }
-        case SHARED_PTR: {
-             if(ptr.generic.ctrl->nshared > 0) {
-                 ptr.generic.ctrl->nshared++;
-                 return (shared_ptr_option)ptr;
-             }
-             return (shared_ptr_option){0};
+        case SMRTPTR_STRONG: {
+            ptr.generic.ctrl->nstrong++;
+            return (shared_ptr_option)ptr;
         }
-        default: smrtptr_log_error(SMRTPTR_INVALID_TYPE);
+        default: {
+            smrtptr_errno |= SMRTPTR_INVALID_TYPE;
+            return (shared_ptr_option){0};
+        }
     }
 }
 
-static void free_weak_ptr(void* ptr) {
+static void smrtptr_free_weak(void* ptr) {
+    /* This type points to void and has no strong or weak association
+     * this allows for any type to be implemented */
     _generic_shared_ptr* _ptr = ptr;
-    _ptr->ctrl->nweak--;
-    if(_ptr->ctrl->nshared == 0 && _ptr->ctrl->nweak == 0) free(_ptr->ctrl);
+    /* we don't check the strong count because nweak only becomes 0
+     * once all strong pointers are gone due to strong pointers implicitly
+     * having a weak reference */
+    if(--_ptr->ctrl->nweak == 0) free(_ptr->ctrl);
 }
 
 #undef SHARED_PTR_DERIVE
 
-#define shared_ptr(T) __attribute__(( cleanup(free_shared_ptr) )) T##_shared_ptr
-#define weak_ptr(T) __attribute__(( cleanup(free_weak_ptr) )) T##_weak_ptr
-#define make_shared_ptr(T, alloc, dealloc)  _make_shared_ptr(alloc, dealloc)._is_##T 
-#define clone_shared_ptr(T, ptr, type) _clone_shared_ptr((union shared_ptr_types)ptr, type).IS_##type._is_##T
-#define clone_weak_ptr(T, ptr, type) _clone_weak_ptr((union weak_ptr_types)ptr, type).IS_##type._is_##T
+#define smrtptr_strong(T) __attribute__(( cleanup(smrtptr_free_strong) )) T##_smrtptr_strong
+#define smrtptr_weak(T) __attribute__(( cleanup(smrtptr_free_weak) )) T##_smrtptr_weak
+#define smrtptr_make_strong(T, alloc, dealloc)  _smrtptr_make_strong(alloc, dealloc)._is_##T 
+#define smrtptr_clone_strong(T, ptr, type) _smrtptr_clone_strong((union smrtptr_strong_types)ptr, type).IS_##type._is_##T
+#define smrtptr_clone_weak(T, ptr, type) _smrtptr_clone_weak((union smrtptr_weak_types)ptr, type).IS_##type._is_##T
 #define deref_smrtptr(smrtptr) *smrtptr.ptr
 #define ref_smrtptr(smrtptr) smrtptr.ptr
-#define is_ptr_dead(smrtptr) !!(( smrtptr ).ctrl->nshared)
-#endif
+#define is_ptr_alive(smrtptr) !!(( smrtptr ).ctrl->nstrong)
+#endif // }}}
+
+/***************************** ATOMIC SHARED PTRS *****************************/// {{{
+
+#ifdef SMRTPTR_SHARED_ATOMIC_TYPE_LIST
+/* Thread safe implementation of shared and weak pointers using atomic reference counting */
+#include <stdatomic.h>
+
+/* The control block that is used for strong and weak pointers for all base types */
+typedef struct {
+    atomic_size_t nstrong;
+    atomic_size_t nweak;
+    void (*destructor)(void*);
+} atomic_shared_ptr_ctrlblk;
+
+/* @brief:      Defines the necessary structures and unions for a the list of weak and 
+ *              strong pointer types
+ *                  - T##_smrtptr_strong: Clonable owning pointer
+ *                  - T##_smrtptr_weak: Clonable non-owning pointer (can be promoted)
+ *                  - T##_smrtptr_option: Union containing a weak or strong pointer 
+ *                      - Used for generic return from cloning funcions
+ * @param:      [T] - the type to derive a strong pointer type for 
+ * @param:      [free_fn] (UNUSED): ~function pointer to the function responsible for freeing the memory
+ *                      must be of type void (*)(void*)~
+ */
+#define SMRTPTR_DERIVE_SHARED_ATOMIC(T, free_fn)   \
+    typedef struct {                    \
+        T *ptr;                         \
+        atomic_shared_ptr_ctrlblk *ctrl;       \
+    } T##_smrtptr_strong_atomic;        \
+    \
+    typedef struct {                    \
+        T* _ptr;                        \
+        atomic_shared_ptr_ctrlblk* ctrl;       \
+    } T##_smrtptr_weak_atomic;                     \
+
+SMRTPTR_SHARED_ATOMIC_TYPE_LIST
+#undef SMRTPTR_DERIVE_SHARED_ATOMIC
+
+/* Used internally for generic ptr types */
+typedef struct {
+    void* ptr;
+    atomic_shared_ptr_ctrlblk* ctrl;
+} _generic_atomic_shared_ptr;
+
+#define SMRTPTR_DERIVE_SHARED_ATOMIC(T, unused) T##_smrtptr_strong_atomic _is_##T;
+union smrtptr_strong_atomic_types {
+    SMRTPTR_SHARED_ATOMIC_TYPE_LIST
+    _generic_atomic_shared_ptr generic;
+};
+#undef SMRTPTR_DERIVE_SHARED_ATOMIC
+
+#define SMRTPTR_DERIVE_SHARED_ATOMIC(T, unused) T##_smrtptr_weak_atomic _is_##T;
+union smrtptr_weak_atomic_types {
+    SMRTPTR_SHARED_ATOMIC_TYPE_LIST
+    _generic_atomic_shared_ptr generic;
+};
+#undef SMRTPTR_DERIVE_SHARED_ATOMIC
+
+typedef union {
+    union smrtptr_strong_atomic_types IS_SMRTPTR_STRONG_ATOMIC;
+    union smrtptr_weak_atomic_types IS_SMRTPTR_WEAK_ATOMIC;
+} atomic_shared_ptr_option;
+
+/* @brief:      Makes a strong pointer from an allocated void pointer and deallocates using the
+ *              specified deallocator when fully out of scope 
+ * @param:      void* alloc:    the pointer to *freshly* allocated memory 
+ * @param:      void (*dealloc)(void*): function pointer that will be called when the pointer goes
+ *              out of scope and gets freed 
+ */
+[[nodiscard]] __attribute__((unused))
+static union smrtptr_strong_atomic_types _smrtptr_make_strong_atomic(void *alloc, void (*dealloc)(void*)) {
+    if (alloc == NULL) {
+        smrtptr_errno |= SMRTPTR_MAKE_RECIEVED_NULL;
+        return (union smrtptr_strong_atomic_types){0};
+    }
+    atomic_shared_ptr_ctrlblk* temp_ctrl = malloc(sizeof(shared_ptr_ctrlblk));
+    atomic_init(&temp_ctrl->nstrong, 1);
+    atomic_init(&temp_ctrl->nweak, 1);
+    temp_ctrl->destructor = dealloc;
+    _generic_atomic_shared_ptr generic_ptr = {
+        .ptr = alloc,
+        .ctrl = temp_ctrl,
+    };
+    return (union smrtptr_strong_atomic_types)generic_ptr;
+}
+
+/* @brief:      clones a strong atomic pointer into a weak or strong atomic pointer 
+ * @param:      union smrtptr_strong_atomic_types ptr: Union containing all the smrtptr types
+ *              implemented for atomic reference counting 
+ * @param:      enum smrtptr_types type: the type of smrtptr (WEAK or STRONG)
+ */
+[[nodiscard]] __attribute__((unused)) 
+static atomic_shared_ptr_option _smrtptr_clone_strong_atomic(
+    union smrtptr_strong_atomic_types ptr,
+    enum smrtptr_types type
+) {
+    if(ptr.generic.ctrl == NULL) {
+        smrtptr_errno |= SMRTPTR_NULL_CTRL_BLOCK;
+        return (atomic_shared_ptr_option){0};
+    }
+    switch (type) {
+        /* ++ and -- operators are not suitable for atomic reference counting */
+        case SMRTPTR_STRONG_ATOMIC: {
+            atomic_fetch_add_explicit(&ptr.generic.ctrl->nstrong, 1, memory_order_relaxed);
+            break;
+        }
+        case SMRTPTR_WEAK_ATOMIC: {
+            atomic_fetch_add_explicit(&ptr.generic.ctrl->nweak, 1, memory_order_relaxed);
+            break;
+        }
+        default: {
+            smrtptr_errno |= SMRTPTR_INVALID_TYPE;
+            return (atomic_shared_ptr_option){0};
+        }
+    }
+    return (atomic_shared_ptr_option)ptr;
+}
+
+__attribute__((unused)) 
+static void smrtptr_free_strong_atomic(void* ptr) {
+    _generic_atomic_shared_ptr* _ptr = (_generic_atomic_shared_ptr*)ptr;
+    if(_ptr->ctrl == NULL) {
+        smrtptr_errno |= SMRTPTR_NULL_CTRL_BLOCK;
+        return;
+    }
+    /* atomic_fetch_sub_explicit returns the old value. If we subtracted 1 and old value is
+     * 1 then count must be 0 */
+    if(atomic_fetch_sub_explicit(&_ptr->ctrl->nstrong, 1, memory_order_release) == 1) {
+        atomic_thread_fence(memory_order_acquire);
+        _ptr->ctrl->destructor(_ptr->ptr);
+        if(atomic_fetch_sub_explicit(&_ptr->ctrl->nweak, 1, memory_order_release) == 1) {
+            atomic_thread_fence(memory_order_acquire);
+            free(_ptr->ctrl);
+        }
+    }
+}
+
+/* Weak pointers (are implemented for any type that strong ptr is implemented for) */
+[[nodiscard]] atomic_shared_ptr_option _smrtptr_clone_weak_atomic(
+    union smrtptr_weak_atomic_types ptr,
+    enum smrtptr_types type
+) {
+    switch(type){
+        case SMRTPTR_WEAK_ATOMIC: {
+            ptr.generic.ctrl->nweak++;
+            return (atomic_shared_ptr_option)ptr;
+        }
+        case SMRTPTR_STRONG_ATOMIC: {
+             ptr.generic.ctrl->nstrong++;
+             return (atomic_shared_ptr_option)ptr;
+        }
+        default: { 
+            smrtptr_errno |= SMRTPTR_INVALID_TYPE;
+            return (atomic_shared_ptr_option){0};
+        }
+    }
+}
+
+__attribute__((unused)) static void smrtptr_free_weak_atomic(void* ptr) {
+    _generic_atomic_shared_ptr* _ptr = ptr;
+    if(atomic_fetch_sub_explicit(&_ptr->ctrl->nweak, 1, memory_order_release) == 1) {
+        atomic_thread_fence(memory_order_acquire);
+        free(_ptr->ctrl);
+    }
+}
+
+__attribute__((unused))
+static union smrtptr_strong_atomic_types smrtptr_lock_weak_atomic(
+    union smrtptr_weak_atomic_types ptr
+) {
+    size_t nrefs;
+    do {
+        nrefs = atomic_load_explicit(&ptr.generic.ctrl->nstrong, memory_order_acquire); 
+        if(nrefs == 0) {
+            /* Is dead */
+            ptr.generic.ctrl = NULL;
+            ptr.generic.ptr = NULL;
+            break;
+        }
+    } while(!atomic_compare_exchange_weak_explicit(
+        &ptr.generic.ctrl->nstrong,
+        &nrefs,
+        nrefs + 1,
+        memory_order_acq_rel,
+        memory_order_acquire
+    ));
+    return ((atomic_shared_ptr_option)ptr).IS_SMRTPTR_STRONG_ATOMIC;
+}
+
+#define smrtptr_strong_atomic(T) __attribute__(( cleanup(smrtptr_free_strong_atomic) )) T##_smrtptr_strong_atomic
+#define smrtptr_weak_atomic(T) __attribute__(( cleanup(smrtptr_free_weak_atomic) )) T##_smrtptr_weak_atomic
+#define smrtptr_make_strong_atomic(T, alloc, dealloc)  _smrtptr_make_strong_atomic(alloc, dealloc)._is_##T 
+#define smrtptr_clone_strong_atomic(T, ptr, type) _smrtptr_clone_strong_atomic((union smrtptr_strong_atomic_types)ptr, type).IS_##type._is_##T
+#define smrtptr_clone_weak_atomic(T, ptr, type) _smrtptr_clone_weak_atomic((union smrtptr_weak_atomic_types)ptr, type).IS_##type._is_##T
+#define deref_smrtptr(smrtptr) *smrtptr.ptr
+#define ref_smrtptr(smrtptr) smrtptr.ptr
+#define smrtptr_lock_weak_atomic(smrtptr) (smrtptr).ctrl != NULL
+
+#endif // }}}
+
 #endif
