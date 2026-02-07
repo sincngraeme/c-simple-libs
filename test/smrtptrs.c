@@ -40,16 +40,16 @@ int main() {
         deref_smrtptr(ptr2) = 10;
         printf("ptr2: %d\n", deref_smrtptr(ptr2));
         {
-            smrtptr_strong(int) ptr3 = smrtptr_clone_strong(int, ptr2, SMRTPTR_STRONG);
+            smrtptr_strong(int) ptr3 = smrtptr_copy_strong(int, ptr2, SMRTPTR_STRONG);
             if(smrtptr_errno) return smrtptr_errno;
             { /* Create a smrtptr_weak */
-                smrtptr_weak(int) ptr4 = smrtptr_clone_strong(int, ptr3, SMRTPTR_WEAK);
+                smrtptr_weak(int) ptr4 = smrtptr_copy_strong(int, ptr3, SMRTPTR_WEAK);
                 if(smrtptr_errno) return smrtptr_errno;
-                smrtptr_weak(int) ptr5 = smrtptr_clone_weak(int, ptr4, SMRTPTR_WEAK);
+                smrtptr_weak(int) ptr5 = smrtptr_copy_weak(int, ptr4, SMRTPTR_WEAK);
                 if(smrtptr_errno) return smrtptr_errno;
                 { 
                     smrtptr_strong(int) ptr6;
-                    if( is_ptr_alive(ptr6 = smrtptr_clone_weak(int, ptr4, SMRTPTR_STRONG)) ) {
+                    if( is_ptr_alive(ptr6 = smrtptr_copy_weak(int, ptr4, SMRTPTR_STRONG)) ) {
                         printf("ptr6: %d\n", deref_smrtptr(ptr6)); /* Reading */
                     }
                 }
@@ -64,12 +64,12 @@ int main() {
         deref_smrtptr(ptr7) = 10;
         printf("ptr7: %d\n", deref_smrtptr(ptr7));
         {
-            smrtptr_strong_atomic(int) ptr8 = smrtptr_clone_strong_atomic(int, ptr7, SMRTPTR_STRONG_ATOMIC);
+            smrtptr_strong_atomic(int) ptr8 = smrtptr_copy_strong_atomic(int, ptr7, SMRTPTR_STRONG_ATOMIC);
             if(smrtptr_errno) return smrtptr_errno;
             { /* Create a smrtptr_weak */
-                smrtptr_weak_atomic(int) ptr9 = smrtptr_clone_strong_atomic(int, ptr8, SMRTPTR_WEAK_ATOMIC);
+                smrtptr_weak_atomic(int) ptr9 = smrtptr_copy_strong_atomic(int, ptr8, SMRTPTR_WEAK_ATOMIC);
                 if(smrtptr_errno) return smrtptr_errno;
-                smrtptr_weak_atomic(int) ptr10 = smrtptr_clone_weak_atomic(int, ptr9, SMRTPTR_WEAK_ATOMIC);
+                smrtptr_weak_atomic(int) ptr10 = smrtptr_copy_weak_atomic(int, ptr9, SMRTPTR_WEAK_ATOMIC);
                 if(smrtptr_errno) return smrtptr_errno;
                 { 
                     smrtptr_strong_atomic(int) ptr11;
@@ -121,7 +121,7 @@ int main() {
     //     smrtptr_strong_atomic(int) atom_ptr = smrtptr_make_strong_atomic(int, malloc(sizeof(int)), free);
     //     deref_smrtptr(atom_ptr) = 10;
     //     printf("Shared atomic 1: %d\n", deref_smrtptr(atom_ptr));
-    //     smrtptr_strong_atomic(int) atom_ptr2 = smrtptr_clone_strong_atomic(int, atom_ptr, SMRTPTR_STRONG_ATOMIC);
+    //     smrtptr_strong_atomic(int) atom_ptr2 = smrtptr_copy_strong_atomic(int, atom_ptr, SMRTPTR_STRONG_ATOMIC);
     //     printf("Shared atomic 2: %d\n", deref_smrtptr(atom_ptr));
     // }
     printf("Hello There!\n");

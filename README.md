@@ -594,7 +594,7 @@ Assuming the file could be opened, this will write a new line to the file and th
 Shared pointers are for when the ownership of the data must be shared. Unique pointers are not suitable for this because the data is freed as soon
 as the first `unique_ptr` goes out of scope. This is undefined behaviour. In `C++` an attempt to copy a `unique_ptr` results in a compiler error.
 That is not the case here because `C` does not have copy constructors or operator overloading. It is therefore up to the programmer to ensure they
-do not attempt to clone a unique pointer, or assign it directly to a raw pointer.
+do not attempt to copy a unique pointer, or assign it directly to a raw pointer.
 
 Unlike `unique_ptr`, `shared_ptr` is a compound type:
 
@@ -607,7 +607,7 @@ typedef struct {
 
 This means that direct assignment to a raw pointer or dereferencing is not possible. The basics of how `shared_ptr` works is as follows:
 - Creation of a pointer is handled with `make_shared_ptr` (this initializes the reference counts and allocates the control block).
-- Cloning of a pointer is handled with `clone_smrtptr` (this increments the reference count for the corresponding reference type).
+- Cloning of a pointer is handled with `copy_smrtptr` (this increments the reference count for the corresponding reference type).
 - The freeing function is called at the end of each scope and only frees the data once the shared reference count goes to 0.
     - The control block is freed once the weak reference count is also 0.
 
@@ -628,16 +628,16 @@ This means that the shared pointers are "allocator agnostic" and you can use wha
 shared_ptr(int) ptr = make_shared_ptr(int, malloc(sizeof(int)));
 ```
 
-This is not the same as cloning. With cloning the smart pointer has already been allocated. Attempting to clone a raw pointer is invalid.
+This is not the same as cloning. With cloning the smart pointer has already been allocated. Attempting to copy a raw pointer is invalid.
 
-### `clone_smrtptr(ptr, PTR_TYPE)`
+### `copy_smrtptr(ptr, PTR_TYPE)`
 
-`clone_smrtptr` takes 2 arguments:
-1. The `smrtptr` you wish to clone.
+`copy_smrtptr` takes 2 arguments:
+1. The `smrtptr` you wish to copy.
 2. The type of that pointer. (Valid values are `SHARED_PTR` and `WEAK_PTR`). 
 
 ```c
-shared_ptr(int) ptr1 = clone_smrtptr(ptr, SHARED_PTR);
+shared_ptr(int) ptr1 = copy_smrtptr(ptr, SHARED_PTR);
 ```
 
 In the above example, `ptr` is a shared pointer, and we are creating another shared pointer, `ptr1`, which references the same data and shares
@@ -647,10 +647,10 @@ that data.
 However, sometimes we do not want to have our reference take ownership of the data such as to prevent cyclical references which prevent the data
 from being freed. In this case, a `weak_ptr` must be used.
 
-`clone_smrtptr` can also create a `weak_ptr` to the data, if passed `WEAK_PTR` as the pointer type. 
+`copy_smrtptr` can also create a `weak_ptr` to the data, if passed `WEAK_PTR` as the pointer type. 
 
 ```c
-weak_ptr(int) ptr3 = clone_smrtptr(ptr, WEAK_PTR);
+weak_ptr(int) ptr3 = copy_smrtptr(ptr, WEAK_PTR);
 ```
 
 In this case, `ptr` is still a shared pointer, so a weak (non-owning) reference to the same data is created and stored in `ptr3`, and `ptr` still
