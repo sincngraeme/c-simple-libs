@@ -1,11 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #define SMRTPTR_IMPLEMENTATION
 
 #define SMRTPTR_UNIQUE_TYPE_LIST \
-    SMRTPTR_UNIQUE_DERIVE(int, free) \
-    SMRTPTR_UNIQUE_DERIVE(FILE, close_file)
+    SMRTPTR_DERIVE_UNIQUE(int, free) \
+    SMRTPTR_DERIVE_UNIQUE(FILE, close_file)
 
 #define SHARED_PTR_TYPE_LIST \
     SHARED_PTR_DERIVE(int, free)
@@ -25,9 +26,12 @@ void close_file(void* void_fp) {
 
 int main() {
     {
-        smrtptr_unique(int) ptr1 = make_smrtptr_unique(int, malloc(sizeof(int)), free);
+        smrtptr_unique(int) ptr1 = smrtptr_make_unique(int, malloc(sizeof(int)), free);
         deref_smrtptr(ptr1) = 1;
         printf("ptr1: %d\n", *ptr1.ptr);
+        smrtptr_unique(int) _ptr1 = smrtptr_move_unique(int, &ptr1);
+        assert(ptr1.ptr == NULL);
+        assert(deref_smrtptr(_ptr1) == 1);
     }
     {
         // Shared ptr
@@ -85,7 +89,7 @@ int main() {
     }
     {
         // File IO
-        smrtptr_unique(FILE) fp = make_smrtptr_unique(FILE, fopen("test.txt", "a"), close_file);
+        smrtptr_unique(FILE) fp = smrtptr_make_unique(FILE, fopen("test.txt", "a"), close_file);
         if(smrtptr_errno) return smrtptr_errno;
         if(fp.ptr == NULL) {
             fprintf(stderr, "ERROR: Failed to open file\n");
@@ -101,7 +105,7 @@ int main() {
     }
     {
         // File IO
-        smrtptr_unique(FILE) fp = make_smrtptr_unique(FILE, fopen("test.txt", "r"), close_file);
+        smrtptr_unique(FILE) fp = smrtptr_make_unique(FILE, fopen("test.txt", "r"), close_file);
         if(smrtptr_errno) return smrtptr_errno;
         char buf[256] = {0};
         if(fp.ptr == NULL) {

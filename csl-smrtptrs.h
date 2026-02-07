@@ -19,10 +19,12 @@ enum smrtptr_types {
 };
 
 enum smrtptr_errors {
-    SMRTPTR_NOERR               = 0b000,
-    SMRTPTR_INVALID_TYPE        = 0b001,
-    SMRTPTR_MAKE_RECIEVED_NULL  = 0b010,
-    SMRTPTR_NULL_CTRL_BLOCK     = 0b100,
+    SMRTPTR_NOERR               = 0b00000,
+    SMRTPTR_INVALID_TYPE        = 0b00001,
+    SMRTPTR_MAKE_RECIEVED_NULL  = 0b00010,
+    SMRTPTR_NULL_CTRL_BLOCK     = 0b00100,
+    SMRTPTR_FREE_RECIEVED_NULL  = 0b01000,
+    SMRTPTR_NULL_DESTRUCTOR     = 0b10000,
 };
 
 static enum smrtptr_errors smrtptr_errno = 0;
@@ -36,16 +38,16 @@ typedef struct {
     void (*destructor)(void*);
 } _void_smrtptr_unique; 
 
-#define SMRTPTR_UNIQUE_DERIVE(T, free_fn)        \
+#define SMRTPTR_DERIVE_UNIQUE(T, free_fn)        \
     typedef struct {                \
         T* ptr;                     \
         void (*destructor)(void*);  \
     } T##_smrtptr_unique; 
 
 SMRTPTR_UNIQUE_TYPE_LIST 
-#undef SMRTPTR_UNIQUE_DERIVE
+#undef SMRTPTR_DERIVE_UNIQUE
 
-#define SMRTPTR_UNIQUE_DERIVE(T, free_fn) T##_smrtptr_unique _is_##T;
+#define SMRTPTR_DERIVE_UNIQUE(T, free_fn) T##_smrtptr_unique T##_member;
 
 /* Generate a union which contains all unique ptr types. These will differ
  * only in the base type they contain */
@@ -54,23 +56,24 @@ union smrtptr_unique_types {
     _void_smrtptr_unique generic;   // All types will be processed as this type (void*)
 };
 
-SMRTPTR_UNIQUE_TYPE_LIST 
-#undef SMRTPTR_UNIQUE_DERIVE
+#undef SMRTPTR_DERIVE_UNIQUE
 
 /* This takes in a void ptr so it can be compatible with all smrtptr types
  * We then cast the ptr to the union which contains all types and */
-static void free_smrtptr_unique(void* smrtptr) {
+static void smrtptr_free_unique(void* smrtptr) {
+    if(smrtptr == NULL) {
+        smrtptr_errno |= SMRTPTR_FREE_RECIEVED_NULL;
+        return;
+    }
     union smrtptr_unique_types _smrtptr = *(union smrtptr_unique_types*)smrtptr;
+    if(_smrtptr.generic.destructor == NULL) {
+        return;
+    }
     _smrtptr.generic.destructor(_smrtptr.generic.ptr);
 }
-
-/* @brief: smrtptr_unique type macro */
-#define smrtptr_unique(T) __attribute__(( cleanup(free_smrtptr_unique) )) T##_smrtptr_unique
-/* Calls the internal _make_smrtptr_unique function and specifies the return type based 
- * on the first parameter */
-#define make_smrtptr_unique(T, alloc, dealloc) _make_smrtptr_unique(alloc, dealloc)._is_##T
-
-static union smrtptr_unique_types _make_smrtptr_unique(void* alloc, void (*dealloc)(void*)) {
+/* Returns a new unique pointer to the allocated memory pointed to by alloc, to be freed
+ * later with dealloc */
+static union smrtptr_unique_types _smrtptr_make_unique(void* alloc, void (*dealloc)(void*)) {
     _void_smrtptr_unique smrtptr = { .ptr = NULL, .destructor = NULL };
     if(alloc != NULL && dealloc != NULL) {
         smrtptr.ptr = alloc;
@@ -78,6 +81,22 @@ static union smrtptr_unique_types _make_smrtptr_unique(void* alloc, void (*deall
     }
     return (union smrtptr_unique_types)smrtptr;
 }
+
+/* Moves the data from a unique pointer to another unique pointer */
+__attribute__((unused))
+static union smrtptr_unique_types _smrtptr_move_unique(union smrtptr_unique_types* src) {
+    _void_smrtptr_unique dest = { .ptr = src->generic.ptr, .destructor = src->generic.destructor };
+    src->generic.ptr = NULL;
+    src->generic.destructor = NULL;
+    return (union smrtptr_unique_types)dest;
+}
+
+/* @brief: smrtptr_unique type macro */
+#define smrtptr_unique(T) __attribute__(( cleanup(smrtptr_free_unique) )) T##_smrtptr_unique
+/* Calls the internal _make_smrtptr_unique function and specifies the return type based 
+ * on the first parameter */
+#define smrtptr_make_unique(T, alloc, dealloc) _smrtptr_make_unique(alloc, dealloc).T##_member
+#define smrtptr_move_unique(T, ptr) _smrtptr_move_unique((union smrtptr_unique_types*)ptr).T##_member;
 
 #endif // }}}
 
@@ -141,8 +160,8 @@ typedef union {
     union smrtptr_weak_types IS_SMRTPTR_WEAK;
 } shared_ptr_option;
 
-/* @brief:      Makes a strong pointer from an allocated void pointer and deallocates using the
- *              specified deallocator when fully out of scope 
+/* @brief:      Makes a strong pointer from an allocated void pointer and stores the specified deallocator 
+ *              in the control block for deletion when fully out of scope 
  * @param:      void* alloc:    the pointer to *freshly* allocated memory 
  * @param:      void (*dealloc)(void*): function pointer that will be called when the pointer goes
  *              out of scope and gets freed 
