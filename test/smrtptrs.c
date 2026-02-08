@@ -5,14 +5,17 @@
 #define SMRTPTR_IMPLEMENTATION
 
 #define SMRTPTR_UNIQUE_TYPE_LIST \
-    SMRTPTR_DERIVE_UNIQUE(int, free) \
-    SMRTPTR_DERIVE_UNIQUE(FILE, close_file)
+    SMRTPTR_DERIVE_UNIQUE(int) \
+    SMRTPTR_DERIVE_UNIQUE(FILE)
 
 #define SHARED_PTR_TYPE_LIST \
-    SHARED_PTR_DERIVE(int, free)
+    SHARED_PTR_DERIVE(int)
 
 #define SMRTPTR_SHARED_ATOMIC_TYPE_LIST \
-    SMRTPTR_DERIVE_SHARED_ATOMIC(int, free)
+    SMRTPTR_DERIVE_SHARED_ATOMIC(int)
+
+#define SMRTPTR_RELAY_TYPE_LIST \
+    SMRTPTR_DERIVE_RELAY(int)
 
 void close_file(void* void_fp) {
     FILE* fp = void_fp;
@@ -113,17 +116,39 @@ int main() {
             exit(-1);
         } else {
             printf("File successfully opened!\n");
-            for(int i = 0; fgets(buf, 256, fp.ptr) != NULL; i++) printf("%d | %s", i, buf);
+            for(int i = 0; fgets(buf, 256, ref_smrtptr(fp)) != NULL; i++) printf("%d | %s", i, buf);
             printf("File successfully read from!\n");
         }
     }
-    // {
-    //     smrtptr_strong_atomic(int) atom_ptr = smrtptr_make_strong_atomic(int, malloc(sizeof(int)), free);
-    //     deref_smrtptr(atom_ptr) = 10;
-    //     printf("Shared atomic 1: %d\n", deref_smrtptr(atom_ptr));
-    //     smrtptr_strong_atomic(int) atom_ptr2 = smrtptr_copy_strong_atomic(int, atom_ptr, SMRTPTR_STRONG_ATOMIC);
-    //     printf("Shared atomic 2: %d\n", deref_smrtptr(atom_ptr));
-    // }
+    { // Relay pointers
+        printf("Relay Pointers:\n");
+        // Owner
+        smrtptr_relay(int) ptr8 = smrtptr_make_relay(int, malloc(sizeof(int)), free);
+        // Non-owner
+        smrtptr_relay(int) ptr9 = smrtptr_copy_relay(int, ptr8);
+        assert(ptr9.destructor == NULL);
+        assert(ptr8.destructor != NULL);
+        deref_smrtptr(ptr8) = 20;
+        deref_smrtptr(ptr9) = 30;
+        printf("Owner, Non-Owner: %d == %d (%p, %p)\n",
+            deref_smrtptr( ptr8 ),
+            deref_smrtptr( ptr9 ),
+            ptr8.destructor,
+            ptr9.destructor
+        );
+        // Promote the non-owning reference, and demote the owning reference
+        if(smrtptr_pass_relay(&ptr9, &ptr8)) {
+            fprintf(stderr, "ERROR: Failed to pass ownership\n");
+            return -1;
+        }
+        printf("Owner, Non-Owner: %d == %d (%p, %p)\n",
+            deref_smrtptr( ptr8 ),
+            deref_smrtptr( ptr9 ),
+            ptr8.destructor,
+            ptr9.destructor
+        );
+
+    }
     printf("Hello There!\n");
     return 0;
 }
