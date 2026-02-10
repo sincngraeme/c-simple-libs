@@ -4,8 +4,9 @@ BUILDDIR = .
 PATHSEP = /
 STD = gnu2x
 CFLAGS = -Wall -Wextra -g -std=$(STD)
-SRC = test/pretty-print.c
-HDR = csl-enums.h
+DEFS =
+SRC = test/test.c
+HDR = csl-test.h
 OBJ = $(SRC:.c=.o)
 ARGS = #fake.file -sS --custom-message="General Kenobi!"
 PROGRAM = test
@@ -16,7 +17,7 @@ all: $(OBJ)
 
 # Compile
 $(OBJ): $(SRC)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(DEFS) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OUTDIR)$(PATHSEP)$(PROGRAM) $(OBJ)
