@@ -27,6 +27,30 @@ void close_file(void* void_fp) {
 
 #include "../csl-smrtptrs.h"
 
+/* Takes ownership of the relay pointer and prints its value */
+void take_and_print(int_smrtptr_relay* ptr) {
+    smrtptr_relay(int) _ptr = smrtptr_copy_relay(int, *ptr);
+    if(smrtptr_pass_relay(&_ptr, ptr)) {
+        fprintf(stderr, "ERROR: Failed to take ownership of pointer.\n");
+        exit(-1);
+    }
+    printf("Relay pointer has value: %d\n", deref_smrtptr(_ptr));
+}
+
+/* Takes ownership of the relay pointer and prints its value */
+void print_and_give_back(int_smrtptr_relay* ptr) {
+    smrtptr_relay(int) _ptr = smrtptr_copy_relay(int, *ptr);
+    if(smrtptr_pass_relay(&_ptr, ptr)) {
+        fprintf(stderr, "ERROR: Failed to take ownership of pointer.\n");
+        exit(-1);
+    }
+    printf("Relay pointer has value: %d\n", deref_smrtptr(_ptr));
+    if(smrtptr_pass_relay(ptr, &_ptr)) {
+        fprintf(stderr, "ERROR: Failed to return ownership of pointer.\n");
+        exit(-1);
+    }
+}
+
 int main() {
     {
         smrtptr_unique(int) ptr1 = smrtptr_make_unique(int, malloc(sizeof(int)), free);
@@ -147,7 +171,11 @@ int main() {
             ptr8.destructor,
             ptr9.destructor
         );
-
+        print_and_give_back(&ptr9);
+        assert(ptr9.destructor != NULL && ptr8.destructor == NULL);
+        take_and_print(&ptr9);
+        assert(ptr9.destructor == NULL && ptr8.destructor == NULL);
+        /* Relay pointer is freed */
     }
     printf("Hello There!\n");
     return 0;

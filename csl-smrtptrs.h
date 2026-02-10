@@ -625,6 +625,7 @@ static union smrtptr_relay_types _smrtptr_copy_relay(union smrtptr_relay_types p
     _smrtptr_pass_relay((union smrtptr_relay_types*)dest, (union smrtptr_relay_types*)src)
 #define smrtptr_copy_relay(T, ptr) \
     _smrtptr_copy_relay((union smrtptr_relay_types)ptr).T##_field;
+#define smrtptr_deref_relay(smrtptr) (smrtptr.destructor != NULL) ? *smrtptr.ptr : 
 /* TODO: Reset function and macro wrapper */
 
 #endif // }}}
