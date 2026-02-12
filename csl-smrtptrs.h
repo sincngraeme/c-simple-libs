@@ -8,14 +8,6 @@
 * Github:       https://github.com/sincngraeme                                  *
 ********************************************************************************/
 
-/*
- * TODO: Move functions for strong pointers
- * TODO: Move functions for weak pointers
- * TODO: Move functions for strong atomic pointers
- * TODO: Move functions for weak atomic pointers
- * TODO: relay pointer (single-owner, shared-access)
- */
-
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -56,7 +48,7 @@ enum smrtptr_errors {
 
 static enum smrtptr_errors smrtptr_errno = 0;
 
-/* For optionally removing attributes */
+/* For optionally removing attributes, or providing alternative syntax */
 #ifndef smrtptr_attribute
 #define smrtptr_attribute(attr) __attribute__((attr))
 #endif
@@ -626,7 +618,6 @@ static union smrtptr_relay_types _smrtptr_copy_relay(union smrtptr_relay_types p
 #define smrtptr_copy_relay(T, ptr) \
     _smrtptr_copy_relay((union smrtptr_relay_types)ptr).T##_field;
 #define smrtptr_deref_relay(smrtptr) (smrtptr.destructor != NULL) ? *smrtptr.ptr : 
-/* TODO: Reset function and macro wrapper */
 
 #endif // }}}
 

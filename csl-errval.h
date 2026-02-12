@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Name:             csl-errval.h                                               *
+* Name:             csl-containerr.h                                           *
 * Description:      Provides methods for wrapping return values in "error"     *
 *                   values to have save error handling (rust inspired)         *
 * By:               Nigel Sinclair                                             *
