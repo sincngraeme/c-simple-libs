@@ -142,6 +142,18 @@ typedef enum {
         _res.value; \
     })
 
+/* @brief:  skips evaluation of LHS if result is null
+ * @param:  result - the return value of the function to be checked for null
+ */
+#define IFNULL(result, handler) \
+    ({ \
+        typeof(result) _res = (result); \
+        if (_res == NULL) { \
+            handler; \
+        } \
+        _res; \
+    })
+
 #else
 /* @brief:  unwraps the value contained in RESULT() type - ISO C version
  * @param:  result - the return value of the function to be unwrapped 
