@@ -27,30 +27,6 @@ void close_file(void* void_fp) {
 
 #include "../csl-smrtptrs.h"
 
-/* Takes ownership of the relay pointer and prints its value */
-void take_and_print(int_smrtptr_relay* ptr) {
-    smrtptr_relay(int) _ptr = smrtptr_copy_relay(int, *ptr);
-    if(smrtptr_pass_relay(&_ptr, ptr)) {
-        fprintf(stderr, "ERROR: Failed to take ownership of pointer.\n");
-        exit(-1);
-    }
-    printf("Relay pointer has value: %d\n", deref_smrtptr(_ptr));
-}
-
-/* Takes ownership of the relay pointer and prints its value */
-void print_and_give_back(int_smrtptr_relay* ptr) {
-    smrtptr_relay(int) _ptr = smrtptr_copy_relay(int, *ptr);
-    if(smrtptr_pass_relay(&_ptr, ptr)) {
-        fprintf(stderr, "ERROR: Failed to take ownership of pointer.\n");
-        exit(-1);
-    }
-    printf("Relay pointer has value: %d\n", deref_smrtptr(_ptr));
-    if(smrtptr_pass_relay(ptr, &_ptr)) {
-        fprintf(stderr, "ERROR: Failed to return ownership of pointer.\n");
-        exit(-1);
-    }
-}
-
 int main() {
     {
         smrtptr_unique(int) ptr1 = smrtptr_make_unique(int, malloc(sizeof(int)), free);
@@ -118,12 +94,12 @@ int main() {
         // File IO
         smrtptr_unique(FILE) fp = smrtptr_make_unique(FILE, fopen("test.txt", "a"), close_file);
         if(smrtptr_errno) return smrtptr_errno;
-        if(fp.ptr == NULL) {
+        if(ref_smrtptr(fp) == NULL) {
             fprintf(stderr, "ERROR: Failed to open file\n");
             exit(-1);
         } else {
             printf("File successfully opened!\n");
-            if(fputs("Hello there!\n", fp.ptr) == 0) {
+            if(fputs("Hello there!\n", ref_smrtptr(fp)) == 0) {
                 fprintf(stderr, "ERROR: Failed to write to file\n");
                 return -1;
             };
@@ -143,39 +119,6 @@ int main() {
             for(int i = 0; fgets(buf, 256, ref_smrtptr(fp)) != NULL; i++) printf("%d | %s", i, buf);
             printf("File successfully read from!\n");
         }
-    }
-    { // Relay pointers
-        printf("Relay Pointers:\n");
-        // Owner
-        smrtptr_relay(int) ptr8 = smrtptr_make_relay(int, malloc(sizeof(int)), free);
-        // Non-owner
-        smrtptr_relay(int) ptr9 = smrtptr_copy_relay(int, ptr8);
-        assert(ptr9.destructor == NULL);
-        assert(ptr8.destructor != NULL);
-        deref_smrtptr(ptr8) = 20;
-        deref_smrtptr(ptr9) = 30;
-        printf("Owner, Non-Owner: %d == %d (%p, %p)\n",
-            deref_smrtptr( ptr8 ),
-            deref_smrtptr( ptr9 ),
-            ptr8.destructor,
-            ptr9.destructor
-        );
-        // Promote the non-owning reference, and demote the owning reference
-        if(smrtptr_pass_relay(&ptr9, &ptr8)) {
-            fprintf(stderr, "ERROR: Failed to pass ownership\n");
-            return -1;
-        }
-        printf("Owner, Non-Owner: %d == %d (%p, %p)\n",
-            deref_smrtptr( ptr8 ),
-            deref_smrtptr( ptr9 ),
-            ptr8.destructor,
-            ptr9.destructor
-        );
-        print_and_give_back(&ptr9);
-        assert(ptr9.destructor != NULL && ptr8.destructor == NULL);
-        take_and_print(&ptr9);
-        assert(ptr9.destructor == NULL && ptr8.destructor == NULL);
-        /* Relay pointer is freed */
     }
     printf("Hello There!\n");
     return 0;

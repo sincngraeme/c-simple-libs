@@ -25,8 +25,6 @@ enum smrtptr_types {
     SMRTPTR_STRONG,
     SMRTPTR_STRONG_ATOMIC,
     SMRTPTR_WEAK_ATOMIC,
-    SMRTPTR_RELAY,
-    SMRTPTR_RELAY_ATOMIC,
 };
 
 enum smrtptr_errors {
@@ -292,7 +290,7 @@ static void smrtptr_free_weak(void* ptr) {
     _smrtptr_copy_strong((union smrtptr_strong_types)ptr, type).type##_FIELD.T##_field
 #define smrtptr_copy_weak(T, ptr, type) \
     _smrtptr_copy_weak((union smrtptr_weak_types)ptr, type).type##_FIELD.T##_field
-#define is_ptr_alive(smrtptr) !!(( smrtptr ).ctrl->nstrong)
+#define smrtptr_is_alive(smrtptr) !!(( smrtptr ).ctrl->nstrong)
 #endif // }}}
 
 /***************************** ATOMIC SHARED PTRS *****************************/// {{{
@@ -495,129 +493,6 @@ static union smrtptr_strong_atomic_types _smrtptr_lock_weak_atomic(
     _smrtptr_copy_weak_atomic((union smrtptr_weak_atomic_types)ptr, type).type##_FIELD.T##_field
 #define smrtptr_lock_weak_atomic(T, strong, weak) \
     (strong = _smrtptr_lock_weak_atomic((union smrtptr_weak_atomic_types)weak).T##_field).ctrl != NULL
-
-#endif // }}}
-
-/******************************* RELAY POINTERS ********************************/// {{{
-
-#ifdef SMRTPTR_RELAY_TYPE_LIST
-
-
-typedef struct {
-    void* ptr;
-    void (*destructor)(void*);
-    size_t* nrefs;
-} _generic_smrtptr_relay;
-
-#define SMRTPTR_DERIVE_RELAY(T)     \
-    typedef struct {                \
-        T* ptr;                     \
-        void (*destructor)(void*);  \
-        size_t* nrefs;              \
-    } T##_smrtptr_relay;
-
-SMRTPTR_RELAY_TYPE_LIST
-#undef SMRTPTR_DERIVE_RELAY
-
-#define SMRTPTR_DERIVE_RELAY(T) T##_smrtptr_relay T##_field;
-
-/* Generate a union which contains all relay ptr types. These will differ
- * only in the base type they contain */
-union smrtptr_relay_types {
-    SMRTPTR_RELAY_TYPE_LIST
-    _generic_smrtptr_relay generic;   // All types will be processed as this type (void*)
-};
-
-#undef SMRTPTR_DERIVE_RELAY
-
-/* This takes in a void ptr so it can be compatible with all smrtptr types
- * We then cast the ptr to the union which contains all types and */
-static void smrtptr_free_relay(void* smrtptr) {
-    if(smrtptr == NULL) {
-        smrtptr_errno |= SMRTPTR_FREE_RECIEVED_NULL;
-        return;
-    }
-    union smrtptr_relay_types _smrtptr = *(union smrtptr_relay_types*)smrtptr;
-    if(_smrtptr.generic.nrefs == NULL) {
-        smrtptr_errno |= SMRTPTR_NULL_REFCOUNT;
-        return;
-    }
-    /* If the destructor is NULL we do not have ownership */
-    if(_smrtptr.generic.destructor != NULL) {
-        /* If we do have ownership then we free the ptr */
-        _smrtptr.generic.destructor(_smrtptr.generic.ptr);
-    }
-    /* decrease the ref count, if it is then 0 then we free the refcount */
-    if(--(*_smrtptr.generic.nrefs) == 0) {
-        free(_smrtptr.generic.nrefs);
-    }
-}
-/* Returns a new relay pointer to the allocated memory pointed to by alloc, to be freed
- * later with dealloc */
-[[nodiscard]]
-static union smrtptr_relay_types _smrtptr_make_relay(void* alloc, void (*dealloc)(void*)) {
-    _generic_smrtptr_relay smrtptr = {0};
-    if(alloc != NULL && dealloc != NULL) {
-        smrtptr.ptr = alloc;
-        smrtptr.destructor = dealloc;
-        // We want this to be common to all instances
-        if((smrtptr.nrefs = malloc(sizeof(size_t))) == NULL) {
-            smrtptr_errno |= SMRTPTR_MALLOC_FAILED;
-            return (union smrtptr_relay_types){0};
-        }
-        *smrtptr.nrefs = 1;
-    }
-    return (union smrtptr_relay_types)smrtptr;
-}
-
-/* Passes ownership from owning relay ptr to non-owning relay pointer. dest and src must point to the
- * same data and dest must be initialize via smrtptr_copy_relay() first. Does not change the refcount. */
-[[nodiscard]] smrtptr_attribute(unused)
-static enum smrtptr_errors _smrtptr_pass_relay(union smrtptr_relay_types* dest, union smrtptr_relay_types* src) {
-    /* The destination must be initialized, and must not have ownership of
-     * any data. The source must be initialized and have ownersip of its
-     * data */
-    if(src == NULL || dest == NULL) return SMRTPTR_PASS_RECIEVED_NULL;
-    if(src->generic.nrefs == NULL) return SMRTPTR_NULL_REFCOUNT | SMRTPTR_DEST_UNINITIALIZED;
-    if(src->generic.destructor == NULL) return SMRTPTR_SRC_DOES_NOT_OWN;
-    if(dest->generic.destructor != NULL) return SMRTPTR_DEST_HAS_OWNERSHIP;
-    /* Passing ownership to a pointer to different data throws off ref counts and
-     * and results in UB */
-    if(dest->generic.ptr != src->generic.ptr) return SMRTPTR_DEST_PTR_NE_SRC;
-
-    *dest = *src;
-    /* The original no longer has ownership */
-    src->generic.destructor = NULL;
-    return SMRTPTR_NOERR;
-}
-
-/* Copies a relay pointer. Does not care about ownership of source, 
- * destination must be non-owning */
-[[nodiscard]]
-static union smrtptr_relay_types _smrtptr_copy_relay(union smrtptr_relay_types ptr) {
-    if(ptr.generic.nrefs == NULL) {
-        smrtptr_errno |= SMRTPTR_NULL_REFCOUNT;
-        return (union smrtptr_relay_types){0};
-    }
-    (*ptr.generic.nrefs)++;
-    return (union smrtptr_relay_types)(
-        (_generic_smrtptr_relay){
-            .ptr = ptr.generic.ptr,
-            .nrefs = ptr.generic.nrefs,
-            // source may have ownersip or not, dest never has ownersip
-            .destructor = NULL
-        }
-    );
-}
-
-/* Macro wrappers for functions to handle generic types */
-#define smrtptr_relay(T) smrtptr_attribute( cleanup(smrtptr_free_relay) ) T##_smrtptr_relay
-#define smrtptr_make_relay(T, alloc, dealloc) _smrtptr_make_relay(alloc, dealloc).T##_field
-#define smrtptr_pass_relay(dest, src) \
-    _smrtptr_pass_relay((union smrtptr_relay_types*)dest, (union smrtptr_relay_types*)src)
-#define smrtptr_copy_relay(T, ptr) \
-    _smrtptr_copy_relay((union smrtptr_relay_types)ptr).T##_field;
-#define smrtptr_deref_relay(smrtptr) (smrtptr.destructor != NULL) ? *smrtptr.ptr : 
 
 #endif // }}}
 
