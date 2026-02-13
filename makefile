@@ -1,5 +1,5 @@
 CC = gcc
-OUTDIR = bin
+OUTDIR = ./bin
 BUILDDIR = .
 PATHSEP = /
 CFLAGS = -Wall -Wextra -g -fsanitize=address

@@ -31,6 +31,7 @@ with their use on Windows. I cannot speak to these libraries compatibility with 
 - [csl-recursed](#csl-recursed.h)
 - [csl-templates](#csl-templates.h)
 - [csl-smrtptrs](#csl-smrtptrs.h)
+- [csl-pprint](#csl-pprint)
 
 ## csl-errval (GNU Extended)
 
@@ -715,3 +716,24 @@ pointer within that scope safely knowing that the lifetime of the data is guaran
 current scope.
 
 Failing to lock the weak pointer first will result in use-after-frees and other annoying issues.
+
+## csl-pretty-print
+
+This module provides a simple wrapper for the standard library `printf`, but with type inference. This means that the format string can be omitted, and the types will be printed as normal.
+
+```c
+#include <stdio.h>
+#include "csl-pprint.h"
+
+int main() {
+    printp("Hello There! My number is: ", 10, " Nice Number...\n");
+    // result -> Hello There! My number is: 10 Nice Number... 
+    return 0;
+}
+
+```
+
+This module depends on the module `csl-recursed.h` so that the preprocessor can recursively parse the variable argument list and generate the type inference for each argument. There is an extra function call compared to `printf` which concatenates all the type specifiers to make the format string. Therefore there is some overhead compared to `printf`.
+
+>[!note]
+>If you want to specify a format width or otherwise have more control over the representation of the types, this is not possible. In this scenario just use `printf`.
