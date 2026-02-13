@@ -52,7 +52,7 @@ int main() {
                 if(smrtptr_errno) return smrtptr_errno;
                 { 
                     smrtptr_strong(int) ptr6;
-                    if( is_ptr_alive(ptr6 = smrtptr_copy_weak(int, ptr4, SMRTPTR_STRONG)) ) {
+                    if( smrtptr_is_alive(ptr6 = smrtptr_copy_weak(int, ptr4, SMRTPTR_STRONG)) ) {
                         printf("ptr6: %d\n", deref_smrtptr(ptr6)); /* Reading */
                     }
                 }
