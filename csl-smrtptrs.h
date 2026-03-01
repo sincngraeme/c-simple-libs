@@ -66,7 +66,7 @@ typedef struct {
 
 #define SMRTPTR_DERIVE_UNIQUE(T)        \
     typedef struct {                \
-        T* ptr;                     \
+        T* const ptr;                     \
         void (*destructor)(void*);  \
     } T##_smrtptr_unique;
 
@@ -112,8 +112,9 @@ static union smrtptr_unique_types _smrtptr_make_unique(void* alloc, void (*deall
 smrtptr_attribute(unused)
 static union smrtptr_unique_types _smrtptr_move_unique(union smrtptr_unique_types* src) {
     _generic_smrtptr_unique dest = { .ptr = src->generic.ptr, .destructor = src->generic.destructor };
-    src->generic.ptr = NULL;
-    src->generic.destructor = NULL;
+    _generic_smrtptr_unique* _src = (_generic_smrtptr_unique*)src; // So we can modify
+    _src->ptr = NULL;
+    _src->destructor = NULL;
     return (union smrtptr_unique_types)dest;
 }
 
@@ -149,7 +150,7 @@ typedef struct {
  */
 #define SHARED_PTR_DERIVE(T)   \
     typedef struct {                    \
-        T *ptr;                         \
+        T* const ptr;                         \
         shared_ptr_ctrlblk *ctrl;       \
     } T##_smrtptr_strong;                   \
     \
@@ -280,6 +281,23 @@ static void smrtptr_free_weak(void* ptr) {
     if(--_ptr->ctrl->nweak == 0) free(_ptr->ctrl);
 }
 
+[[nodiscard]] smrtptr_attribute(unused)
+static bool _smrtptr_lock_weak(
+    union smrtptr_strong_types* dest_ptr,
+    union smrtptr_weak_types src_ptr
+) {
+    if(src_ptr.generic.ctrl == NULL || src_ptr.generic.ctrl->nstrong == 0) {
+        /* Ptr is dead */
+        dest_ptr->generic.ptr = NULL;
+        dest_ptr->generic.ctrl = NULL;
+        return false;
+    } 
+    /* Ptr is not dead */
+    dest_ptr->generic = src_ptr.generic;
+    dest_ptr->generic.ctrl->nstrong++;
+    return true;
+}
+
 #undef SHARED_PTR_DERIVE
 
 #define smrtptr_strong(T) smrtptr_attribute( cleanup(smrtptr_free_strong) ) T##_smrtptr_strong
@@ -290,7 +308,8 @@ static void smrtptr_free_weak(void* ptr) {
     _smrtptr_copy_strong((union smrtptr_strong_types)ptr, type).type##_FIELD.T##_field
 #define smrtptr_copy_weak(T, ptr, type) \
     _smrtptr_copy_weak((union smrtptr_weak_types)ptr, type).type##_FIELD.T##_field
-#define smrtptr_is_alive(smrtptr) !!(( smrtptr ).ctrl->nstrong)
+#define smrtptr_lock_weak(dest, src) \
+    _smrtptr_lock_weak( (union smrtptr_strong_types*)dest, (union smrtptr_weak_types)src )
 #endif // }}}
 
 /***************************** ATOMIC SHARED PTRS *****************************/// {{{
@@ -318,12 +337,12 @@ typedef struct {
  */
 #define SMRTPTR_DERIVE_SHARED_ATOMIC(T)   \
     typedef struct {                    \
-        T *ptr;                         \
+        T* const ptr;                         \
         atomic_shared_ptr_ctrlblk *ctrl;       \
     } T##_smrtptr_strong_atomic;        \
     \
     typedef struct {                    \
-        T* _ptr;                        \
+        T* const _ptr;                        \
         atomic_shared_ptr_ctrlblk* ctrl;       \
     } T##_smrtptr_weak_atomic;                     \
 
@@ -459,26 +478,28 @@ smrtptr_attribute(unused) static void smrtptr_free_weak_atomic(void* ptr) {
 }
 
 smrtptr_attribute(unused)
-static union smrtptr_strong_atomic_types _smrtptr_lock_weak_atomic(
-    union smrtptr_weak_atomic_types ptr
+static bool _smrtptr_lock_weak_atomic(
+    union smrtptr_strong_atomic_types* dest_ptr,
+    union smrtptr_weak_atomic_types* src_ptr
 ) {
     size_t nrefs;
     do {
-        nrefs = atomic_load_explicit(&ptr.generic.ctrl->nstrong, memory_order_acquire);
+        nrefs = atomic_load_explicit(&src_ptr->generic.ctrl->nstrong, memory_order_acquire);
         if(nrefs == 0) {
             /* Is dead */
-            ptr.generic.ctrl = NULL;
-            ptr.generic.ptr = NULL;
-            break;
+            src_ptr->generic.ctrl = NULL;
+            src_ptr->generic.ptr = NULL;
+            return false;
         }
     } while(!atomic_compare_exchange_weak_explicit(
-        &ptr.generic.ctrl->nstrong,
+        &src_ptr->generic.ctrl->nstrong,
         &nrefs,
         nrefs + 1,
         memory_order_acq_rel,
         memory_order_acquire
     ));
-    return ((atomic_shared_ptr_option)ptr).SMRTPTR_STRONG_ATOMIC_FIELD;
+    dest_ptr->generic = src_ptr->generic;
+    return true;
 }
 
 #define smrtptr_strong_atomic(T) \
@@ -491,8 +512,8 @@ static union smrtptr_strong_atomic_types _smrtptr_lock_weak_atomic(
     _smrtptr_copy_strong_atomic((union smrtptr_strong_atomic_types)ptr, type).type##_FIELD.T##_field
 #define smrtptr_copy_weak_atomic(T, ptr, type) \
     _smrtptr_copy_weak_atomic((union smrtptr_weak_atomic_types)ptr, type).type##_FIELD.T##_field
-#define smrtptr_lock_weak_atomic(T, strong, weak) \
-    (strong = _smrtptr_lock_weak_atomic((union smrtptr_weak_atomic_types)weak).T##_field).ctrl != NULL
+#define smrtptr_lock_weak_atomic(dest, src) \
+    _smrtptr_lock_weak_atomic((union smrtptr_strong_atomic_types*)dest, (union smrtptr_weak_atomic_types*)src)
 
 #endif // }}}
 
