@@ -36,7 +36,6 @@ void csl_run_test(bool result, const char* expr, const char* file, unsigned int 
     }
 }
 
-/* TODO: Atexit function for showing test summary */
 void csl_test_summary(void) {
     printf("================================================================================\n"
             CSL_TEST_ANSI_BOLD "Summary" CSL_TEST_ANSI_RESET ": %zu tests run, %zu failed, %zu passed.\n"
