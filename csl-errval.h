@@ -60,6 +60,7 @@
 #ifndef __ERRVAL_H
 #define __ERRVAL_H
 
+#include <stdbool.h>
 
 /* 1. Detect that the user is compiling with GNU extensions *and*
    wants to use C23 features (or later).                                 */
@@ -78,56 +79,50 @@
 #endif
 
 #if !GNU_STATEMENT_EXPR
-#include <stdio.h>
-#include <setjmp.h>
-#endif
+#error "GNU Statement expressions unsupported."
+#else
 
 /* @type:   result
  * @brief:  The result enum is either an err or ok. The <T>_result_t type is 
  *          a struct which contains the result_t enum type and the template type
  */
-#define RESULT(type) type ## _result_t
-
-typedef enum {
-    _OK,
-    _ERR
-} result_t;
+#define WRESULT(T) T ## _result_t
 
 /* @brief:  defines the result type for a given base type 
  * @param:  type - the type that result will be derived for
  */
-#define DERIVE_RESULT_DIRECT(type) \
-    typedef struct {        \
-        result_t code;      \
-        type value;         \
-    } RESULT(type) 
-
-/* @brief:  defines the result type for a given base type 
- * @param:  type - the type that result will be derived for
- * @param:  alias - alias for the type (for example pchar instead of char*)
- */
-#define DERIVE_RESULT_INDIRECT(type, alias) \
-    typedef struct {        \
-        result_t code;      \
-        type value;         \
-    } RESULT(alias) \
-
+#define DERIVE_WRESULT(T, ...)      \
+    typedef struct {                \
+        bool err;                   \
+        __VA_OPT__(                 \
+         enum {                     \
+            WRESULT_##T##_NO_CODE,  \
+            __VA_ARGS__             \
+         } code;                    \
+        )                           \
+        T value;                    \
+    } WRESULT(T) 
 
 /* @brief:  wraps the value in a result with code OK 
  * @param:  type - the type of the value to be wrapped
  * @parap:  val - the value to be wrapped 
  */
-#define OK(type, val) \
-    (RESULT(type)){ .code = _OK, .value = (val) }
+#define WRESULT_OK(type, val) \
+    (WRESULT(type)){ .err = false, .value = (val) }
 
 /* @brief:  wraps the value in a result with code ERR 
  * @param:  type - the type of the value to be wrapped
  * @parap:  val - the value to be wrapped 
  */
-#define ERR(type, val) \
-    (RESULT(type)){ .code = _ERR, .value = (val) }
+#define WRESULT_ERR(type, val) \
+    (WRESULT(type)){ .err = true, .value = (val) }
 
-#if GNU_STATEMENT_EXPR
+/* @brief:  wraps the value in a result with code ERR 
+ * @param:  type - the type of the value to be wrapped
+ * @parap:  val - the value to be wrapped 
+ */
+#define WRESULT_ERR_CODED(type, val, errcode) \
+    (WRESULT(type)){ .err = true, .value = (val), .code = (errcode) }
 
 /* @brief:  unwraps the value contained in a RESULT() type. Uses the GNU extension
  * statement expressions
@@ -135,11 +130,11 @@ typedef enum {
  */
 #define UNWRAP(result, handler) \
     ({ \
-        typeof(result) _res = (result); \
-        if (_res.code == _ERR) { \
+        typeof(result) wresult = (result); \
+        if (wresult.err) { \
             handler; \
         } \
-        _res.value; \
+        wresult.value; \
     })
 
 /* @brief:  skips evaluation of LHS if result is null
@@ -147,30 +142,12 @@ typedef enum {
  */
 #define IFNULL(result, handler) \
     ({ \
-        typeof(result) _res = (result); \
-        if (_res == NULL) { \
+        typeof(result) errval_result = (result); \
+        if (errval_result  == NULL) { \
             handler; \
         } \
-        _res; \
+        errval_result; \
     })
 
-#else
-/* @brief:  unwraps the value contained in RESULT() type - ISO C version
- * @param:  result - the return value of the function to be unwrapped 
- * @return: the result of the expression is the value if there is no error.
- *          if there is an error the function jumps to the saved stack frame
- */
-#define UNWRAP(result)  ( (result).code == _OK) \
-                        ? (result).value \
-                        : (longjmp(result_handler, 1), (typeof((result).value))0)
-
-/* @brief:  sets the result handler before running unwrap */
-#define TRY { jmp_buf result_handler; \
-    if (setjmp(result_handler) == 0)
-
-/* @brief:  syntax sugar for TRY CATCH */
-#define CATCH(handler) else { handler } }
-
 #endif
-
 #endif
