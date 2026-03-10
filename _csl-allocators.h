@@ -5,7 +5,7 @@
 #include <limits.h>
 #include "csl-errval.h"
 
-#ifdef CSL_ARENAS_IMPLEMENTATION
+#if defined(CSL_ARENAS_IMPLEMENTATION)
 
 typedef struct {
     size_t nobjects;
@@ -20,18 +20,19 @@ typedef struct {
 static_assert(CHAR_BIT == 8, "# of bits in byte must be 8 (architecture not supported)\n");
 
 /* For error wrapping */
-DERIVE_RESULT_DIRECT(ObjectArena);
+DERIVE_WRESULT(ObjectArena);
 
 /* Initializes an arena for <nobjects> number of objects of fixed <object_size> size */
-static RESULT(ObjectArena) init_ObjectArena(size_t nobjects, size_t object_size) {
+static WRESULT(ObjectArena) init_ObjectArena(size_t nobjects, size_t object_size) {
     size_t index_stack_size = ( nobjects < 100 ? nobjects : 100 ) * sizeof(size_t); 
     size_t arena_size = nobjects * object_size; 
     /* We allocate space for both the arena and the index stack */
     size_t allocation_size = arena_size + index_stack_size; 
 
-    void* pobjects = IFNULL(malloc(allocation_size), {
-        return ERR( ObjectArena, (ObjectArena){0} );
-    });
+    void* pobjects = malloc(allocation_size);
+    if(pobjects == NULL){
+        return WRESULT_ERR( ObjectArena, (ObjectArena){0} );
+    };
 
     ObjectArena arena = {
         .nobjects = nobjects,
@@ -41,7 +42,7 @@ static RESULT(ObjectArena) init_ObjectArena(size_t nobjects, size_t object_size)
         .index_stack_size = index_stack_size,
     };
     *arena.index_stack = 0; // Starting at the block of memory
-    return OK( ObjectArena, arena );
+    return WRESULT_OK( ObjectArena, arena );
 }
 
 /* Returns a pointer to an object in the allocated arena space */
