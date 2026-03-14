@@ -5,7 +5,7 @@ PATHSEP = /
 CFLAGS = -Wall -Wextra -g -fsanitize=address
 LFLAGS = -fsanitize=address
 STD = gnu2x
-SRC = ./test/smrtptrs.c
+SRC = ./test/wresult.c
 OBJ = $(SRC:.c=.o)
 ARGS = #fake.file -sS --custom-message="General Kenobi!"
 PROGRAM = test
