@@ -1,8 +1,7 @@
 /*******************************************************************************
-* Name:             dstring.h                                                  *
-* Description:      Dynamic string implementation                              *
+* Name:             string.c                                                   *
+* Description:      lenght based and dynamic string implementation             *
 * By:               Nigel Sinclair                                             *
-* Email:            sincngraeme@gmail.com                                      *
 * Github:           https://github.com/sincngraeme/                            *
 * Implementation:   The dstring type is the dynamic string itself. The struct  *
 *                   is a stack resource, which contains pointers to the        *
