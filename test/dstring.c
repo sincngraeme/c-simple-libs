@@ -1,33 +1,35 @@
 #include <stdio.h>
-#include "../dstring.h"
-#include "../errval.h"
+#define CSL_STRING_INTERFACE
+#include "../csl-string.c"
+#include "../csl-errval.h"
 
 int log_num = 0;
 #define LOG_OUTPUT stderr
 #define LOG(message) \
     fprintf(LOG_OUTPUT, message); \
-    String.del(&buffer); \
+    dstring_delete(&buffer); \
     return log_num++;
 
-DSTRING_INIT(String);
-
 int main() {
-    dstring buffer = UNWRAP(String.new("Hello There!"), LOG("Failed to allocate string\n"));
-    printf("String: %s\n", UNWRAP(String.str(buffer), LOG("Failed to access string data\n")));
-    // Add something
-    UNWRAP(String.append(&buffer, " General Kenobi"), LOG("Failed to append to string\n")); 
-    printf("New string: %s\n", UNWRAP(String.str(buffer), LOG("Failed to access string data\n")));
-    // Remove something
-    printf("Prefix: %s\n", UNWRAP(String.strip_prefix(&buffer, 5), {
+    DString buffer = UNWRAP(dstring_new(" There!"), LOG("Failed to allocate string\n"));
+    printf("dstring: %.*s\n", STRFMT(buffer.s));
+    UNWRAP(dstring_prepend(&buffer, "Hello"), LOG("Failed to prepend to string\n"));
+    printf("dstring: %.*s\n", STRFMT(buffer.s));
+    UNWRAP(dstring_append(&buffer, " General Kenobi"), LOG("Failed to append to string\n")); 
+    printf("New string: %.*s\n", STRFMT(buffer.s));
+    // // Remove something
+    printf("Prefix Size: %zu\n", UNWRAP(dstring_strippref(&buffer, 6), {
         LOG("Failed to strip prefix from string\n");
     }));
-    printf("Suffix: %s\n", UNWRAP(String.strip_suffix(&buffer, 6), {
+    printf("New string: %.*s\n", STRFMT(buffer.s));
+    printf("Suffix Size: %zu\n", UNWRAP(dstring_stripsuff(&buffer, 6), {
         LOG("Failed to strip suffix from string\n");
     }));
-    printf("Slice: %s\n", UNWRAP(String.slice(buffer, 2, 5), LOG("Failed to access string data \n")));
-    printf("New string: %s\n", UNWRAP(String.str(buffer), LOG("Failed to access string data\n")));
+    printf("New string: %.*s\n", STRFMT(buffer.s));
+    printf("Slice: %.*s\n", STRFMT(UNWRAP(dstring_get_slice(buffer, 1, 5), LOG("Failed to access string data \n"))));
+    printf("New string: %.*s\n", STRFMT(buffer.s));
     // Free
+    dstring_delete(&buffer);
 
-    String.del(&buffer);
     return 0;
 }
