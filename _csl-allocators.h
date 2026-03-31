@@ -5,7 +5,7 @@
 #include <limits.h>
 #include "csl-errval.h"
 
-#ifdef CSL_ARENAS_IMPLEMENTATION
+#if defined(CSL_ARENAS_IMPLEMENTATION)
 
 typedef struct {
     /* uint8_t ensures pointer arithmetic is in bytes */
@@ -29,9 +29,10 @@ static WRESULT(ObjectArena) init_ObjectArena(size_t nobjects, size_t object_size
     /* We allocate space for both the arena and the index stack */
     size_t allocation_size = arena_size + index_stack_size; 
 
-    void* pobjects = IFNULL(malloc(allocation_size), {
+    void* pobjects = malloc(allocation_size);
+    if(pobjects == NULL) {
         return WRESULT_ERR( ObjectArena, (ObjectArena){0} );
-    });
+    };
 
     ObjectArena arena = {
         .nobjects = nobjects,
