@@ -64,9 +64,9 @@ typedef struct {
     void (*destructor)(void*);
 } _generic_smrtptr_unique;
 
-#define SMRTPTR_DERIVE_UNIQUE(T)        \
+#define SMRTPTR_DERIVE_UNIQUE(T)    \
     typedef struct {                \
-        T* const ptr;                     \
+        T* const ptr;               \
         void (*destructor)(void*);  \
     } T##_smrtptr_unique;
 
