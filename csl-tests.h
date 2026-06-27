@@ -19,10 +19,10 @@
 
 #define CSL_TEST_ASSERT(condition, msg) csl_run_test(condition, #condition, __FILE__, __LINE__, __FUNCTION__, msg)
 
-size_t csl_test_pass_counter = 0;
-size_t csl_test_fail_counter = 0;
+static size_t csl_test_pass_counter = 0;
+static size_t csl_test_fail_counter = 0;
 
-void csl_run_test(bool result, const char* expr, const char* file, unsigned int line, const char* func, const char* msg) {
+static void csl_run_test(bool result, const char* expr, const char* file, unsigned int line, const char* func, const char* msg) {
     if(result) {
         csl_test_pass_counter++;
 #ifndef CSL_TEST_ONLY_FAILS
@@ -36,8 +36,7 @@ void csl_run_test(bool result, const char* expr, const char* file, unsigned int 
     }
 }
 
-/* TODO: Atexit function for showing test summary */
-void csl_test_summary(void) {
+static void csl_test_summary(void) {
     printf("================================================================================\n"
             CSL_TEST_ANSI_BOLD "Summary" CSL_TEST_ANSI_RESET ": %zu tests run, %zu failed, %zu passed.\n"
             , csl_test_pass_counter + csl_test_fail_counter 
@@ -46,5 +45,10 @@ void csl_test_summary(void) {
 }
 
 #define CSL_TEST_INIT if(atexit(csl_test_summary)) fprintf(stderr, "warning: failed to set exit function.\n")
+
+#undef CSL_TEST_ANSI_RED
+#undef CSL_TEST_ANSI_GREEN
+#undef CSL_TEST_ANSI_RESET
+#undef CSL_TEST_ANSI_BOLD
 
 #endif
