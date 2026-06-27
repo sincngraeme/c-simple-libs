@@ -22,7 +22,7 @@
 static size_t csl_test_pass_counter = 0;
 static size_t csl_test_fail_counter = 0;
 
-static void csl_run_test(bool result, const char* expr, const char* file, unsigned int line, const char* func, const char* msg) {
+static bool csl_run_test(bool result, const char* expr, const char* file, unsigned int line, const char* func, const char* msg) {
     if(result) {
         csl_test_pass_counter++;
 #ifndef CSL_TEST_ONLY_FAILS
@@ -34,6 +34,7 @@ static void csl_run_test(bool result, const char* expr, const char* file, unsign
         printf(CSL_TEST_ANSI_BOLD "%s:%u: " CSL_TEST_ANSI_RED "fail: " CSL_TEST_ANSI_RESET 
             "(%s) in function" CSL_TEST_ANSI_BOLD " \"%s\"" CSL_TEST_ANSI_RESET " - %s\n", file, line, expr, func, msg);
     }
+    return result;
 }
 
 static void csl_test_summary(void) {
