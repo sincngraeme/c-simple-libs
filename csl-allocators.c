@@ -4,11 +4,11 @@
  * Github:      https://github.com/sincngraeme
  */
 
-#include "allocators.h"
+#include "csl-allocators.h"
 
 /* Scratch arenas allocate a given number of bytes each time, each pointer 
  * having the same lifetime as the arena. The only way to deallocate is to 
- * reset or delete the arena
+ * reset or destroy the arena
  */
 static void* ScratchAllocator_alloc(ScratchAllocatorData* allocator, usize size) {
     if(allocator == NULL             
@@ -16,31 +16,38 @@ static void* ScratchAllocator_alloc(ScratchAllocatorData* allocator, usize size)
     || allocator->arena.size == 0    
     || size == 0
     ) return NULL;
+    void* ptr = &allocator->arena.mem[allocator->offset];
     allocator->offset += size;
-    return (void*)(allocator->arena.mem + allocator->offset);
+    return ptr;
 }
 
-static void ScratchAllocator_delete(ScratchAllocatorData* allocator) {
-    free(allocator->arena.mem);
-    allocator->arena.mem = NULL;
-    allocator->arena.size = 0;
-    allocator->offset = 0;
+static void ScratchAllocator_destroy(Allocator* self) {
+    assert(self != NULL);
+    assert(self->data.any != NULL);
+    assert(self->parent != NULL);
+    assert(self->parent->vtable.dealloc != NULL);
+    ScratchAllocatorData* data = (ScratchAllocatorData*)self->data.any;
+    bool result = self->parent->vtable.dealloc(self->parent->data.any, data->arena.mem);
+    assert(result);
+    data->arena.mem = NULL;
+    data->arena.size = 0;
+    data->offset = 0;
 }
 
-static void ScratchAllocator_reset(ScratchAllocatorData* allocator) {
-    allocator->offset = 0;
+static void ScratchAllocator_reset(ScratchAllocatorData* data) {
+    data->offset = 0;
 }
 
 void ScratchAllocator_init(Allocator* allocator, ScratchAllocatorData* opts, Allocator* fallback) {
     *allocator = (Allocator){
         .data = { .scratch = opts },
-        .fallback = fallback,
+        .parent = fallback,
         .vtable = {
             .alloc   = (AllocatorAllocFn*)ScratchAllocator_alloc,
             .realloc = NULL,
             .dealloc = NULL,
             .reset   = (AllocatorResetFn*)ScratchAllocator_reset,
-            .delete  = (AllocatorDeleteFn*)ScratchAllocator_delete
+            .destroy  = (AllocatorDestroyFn*)ScratchAllocator_destroy
         }
     };
 }
@@ -93,6 +100,13 @@ Allocator SysAllocator_init(SysAllocatorData* config) {
     };
 }
 
+/*** Block Allocators ***/
+void* BlockAllocator_alloc(AllocatorData* self, size_t size);
+bool  BlockAllocator_realloc(AllocatorData* self, void* data, size_t size);
+bool  BlockAllocator_dealloc(AllocatorData* self, void* data);
+void  BlockAllocator_reset(AllocatorData* self);
+void  BlockAllocator_destroy(struct Allocator* self);
+
 /****** GENERIC ALLOCATOR INTERFACE FUNCTIONS ******/
 void* mem_alloc(Allocator* self, u64 size) {
     if(!self
@@ -104,8 +118,8 @@ void* mem_alloc(Allocator* self, u64 size) {
      * attempt to resize the entire allocation space,
      * then reattempt allocation */
     if(!result) {
-        Allocator* parent = self->fallback;
-        bool parent_supports_realloc = (self->fallback == NULL) ? false: self->fallback->vtable.realloc;
+        Allocator* parent = self->parent;
+        bool parent_supports_realloc = (self->parent == NULL) ? false: self->parent->vtable.realloc;
         if(parent_supports_realloc) {
             if(!parent->vtable.realloc(parent, self->data.any, size)
             || self->vtable.alloc(self->data.any, size) == NULL) goto fail;
@@ -148,9 +162,14 @@ void reset_allocator(Allocator* self) {
     self->vtable.reset(self->data.any);
 }
 
-void delete_allocator(Allocator* self) {
+void destroy_allocator(Allocator* self) {
     assert( self != NULL );
     assert( self->data.any != NULL );
-    assert( self->vtable.delete != NULL );
-    self->vtable.delete(self->data.any);
+    assert( self->parent != NULL);
+    assert( self->parent->vtable.dealloc != NULL);
+    /* If there is a destructor function, run it */
+    if(self->vtable.destroy != NULL) self->vtable.destroy(self);
+    /* NULL out the data to indicate that it is no longer valid
+     * (to be used again must be reinit)*/
+    self->data.any = NULL;
 }

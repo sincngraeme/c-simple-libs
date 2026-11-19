@@ -2,8 +2,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#ifndef CSL_TEST
-# define CSL_TEST
+#ifndef _CSL_TEST_H
+# define _CSL_TEST_H
 
 # ifndef CSL_TEST_NO_COLORS
 #  define CSL_TEST_ANSI_RED   "\033[31m"
@@ -22,7 +22,7 @@
 size_t csl_test_pass_counter = 0;
 size_t csl_test_fail_counter = 0;
 
-void csl_run_test(bool result, const char* expr, const char* file, unsigned int line, const char* func, const char* msg) {
+bool csl_run_test(bool result, const char* expr, const char* file, unsigned int line, const char* func, const char* msg) {
     if(result) {
         csl_test_pass_counter++;
 #ifndef CSL_TEST_ONLY_FAILS
@@ -34,8 +34,10 @@ void csl_run_test(bool result, const char* expr, const char* file, unsigned int 
         printf(CSL_TEST_ANSI_BOLD "%s:%u: " CSL_TEST_ANSI_RED "fail: " CSL_TEST_ANSI_RESET 
             "(%s) in function" CSL_TEST_ANSI_BOLD " \"%s\"" CSL_TEST_ANSI_RESET " - %s\n", file, line, expr, func, msg);
     }
+    return result;
 }
 
+/* TODO: Atexit function for showing test summary */
 void csl_test_summary(void) {
     printf("================================================================================\n"
             CSL_TEST_ANSI_BOLD "Summary" CSL_TEST_ANSI_RESET ": %zu tests run, %zu failed, %zu passed.\n"
@@ -45,5 +47,12 @@ void csl_test_summary(void) {
 }
 
 #define CSL_TEST_INIT if(atexit(csl_test_summary)) fprintf(stderr, "warning: failed to set exit function.\n")
+#define CSL_TEST(fn) bool __attribute__((unused)) csl_test_##fn(void)
+#define CSL_RUN_TEST(fn) csl_test_##fn()
+
+#undef CSL_TEST_ANSI_RED
+#undef CSL_TEST_ANSI_GREEN
+#undef CSL_TEST_ANSI_RESET
+#undef CSL_TEST_ANSI_BOLD
 
 #endif

@@ -14,14 +14,26 @@
 #error "Not a UNIX!" 
 #endif
 
-#define MORTAR_INTERFACES
-#include "utility.c"
-
 /*** INTERFACE ***/
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+typedef uint8_t  u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+typedef size_t usize;
+
+typedef int8_t  i8;
+typedef int16_t i16;
+typedef int32_t i32;
+typedef int64_t i64;
+
+typedef float  f32;
+typedef double f64;
+
 
 /* Generic Container type */
 typedef struct Arena {
@@ -41,6 +53,16 @@ typedef struct {
     usize size;
 } SysAllocatorData;
 
+/* Fixed block sized Allocations are tracked by offsets stored in free blocks */
+typedef struct {
+    Arena arena;
+    usize first_free;
+} BlockAllocatorData;
+
+/* Generic Allocator type 
+ * (To signal that an allocator data struct must be passed)*/
+typedef void AllocatorData;
+
 /* Generic Allocator Interface */
 typedef struct Allocator {
     union { 
@@ -49,20 +71,20 @@ typedef struct Allocator {
         void* any;
     } data;
     struct AllocatorVTable {
-        void* (*alloc)      (struct Allocator* self, size_t size);
-        bool  (*realloc)    (struct Allocator* self, void* data, size_t size);
-        bool  (*dealloc)    (struct Allocator* self, void* data);
-        void  (*reset)      (struct Allocator* self);
-        void  (*delete)     (struct Allocator* self);
+        void* (*alloc)      (AllocatorData* self, size_t size);
+        bool  (*realloc)    (AllocatorData* self, void* data, size_t size);
+        bool  (*dealloc)    (AllocatorData* self, void* data);
+        void  (*reset)      (AllocatorData* self);
+        void  (*destroy)    (struct Allocator* self);
     } vtable;
-    struct Allocator* fallback;
+    struct Allocator* parent;
 } Allocator;
 
-typedef void* (AllocatorAllocFn)      (Allocator* self, size_t size);
-typedef bool  (AllocatorReallocFn)    (Allocator* self, void* data, size_t size);
-typedef bool  (AllocatorDeallocFn)    (Allocator* self, void* data);
-typedef void  (AllocatorResetFn)      (Allocator* self);
-typedef void  (AllocatorDeleteFn)     (Allocator* self);
+typedef void* (AllocatorAllocFn)    (AllocatorData* self, size_t size);
+typedef bool  (AllocatorReallocFn)  (AllocatorData* self, void* data, size_t size);
+typedef bool  (AllocatorDeallocFn)  (AllocatorData* self, void* data);
+typedef void  (AllocatorResetFn)    (AllocatorData* self);
+typedef void  (AllocatorDestroyFn)  (Allocator* self);
 
 /* Generic arena functions which will select the right functions based on 
  * the arena type
@@ -79,13 +101,13 @@ void  mem_reset(Allocator* self);
 /* Resize the entire arena (requires parent allocator) */
 void  mem_resize(Allocator* self, usize size);
 /* Delete the entire arena */
-void  delete_allocator(Allocator* self);
+void  destroy_allocator(Allocator* self);
 
 Allocator SysAllocator_init(SysAllocatorData* config);
 void ScratchAllocator_init(
     Allocator* allocator, 
     ScratchAllocatorData* opts, 
-    Allocator* fallback
+    Allocator* parent
 );
 
 #endif
